@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Administración</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <h2>Panel de Administración</h2>
+            <h3>Alcorta Shopping</h3>
+        </div>
+        <div class="header-right">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo Shopping" class="logo">
+        </div>
+    </header>
+
+    <div class="form-container">
+        <h2>Iniciar Sesión</h2>
+        <div class="input-group">
+            <label for="username">Usuario:</label>
+            <input type="text" id="username" name="username" required>
+        </div>
+        <div class="input-group">
+            <label for="password">Contraseña:</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        <button id="loginBtn" class="form-button">Ingresar</button>
+        <button onclick="window.location.href='/'" class="form-button secondary-button">Volver al Control de Acceso</button>
+        <p id="loginMessage" class="error-message"></p>
+    </div>
+    
+    <footer class="app-footer">
+        <p>Desarrollado por Roberto Laforcada - Copyright © 2025</p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

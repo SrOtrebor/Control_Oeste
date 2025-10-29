@@ -1,0 +1,737 @@
+import os
+from datetime import datetime
+import pandas as pd
+from flask import Flask, jsonify, request
+
+# ... otras importaciones
+# --- Configuración de columnas (opcional, pero buena práctica) ---
+COL_DNI = 'DNI'
+COL_NOMBRE = 'Nombre'
+COL_APELLIDO = 'Apellido'
+COL_NOMBRE_APELLIDO = 'Nombre y Apellido'
+COL_LOCAL = 'Local'
+COL_VENCE = 'Vence'
+COL_TIPO_PERMISO = 'Tipo de Permiso'
+COL_NUM_PERMISO = 'Num_Permiso'
+COL_TAREA_FAP = 'Tarea' # <-- Asegúrate de que esta línea exista
+COL_TAREA_FAO = 'Tarea/s'
+# ... (y cualquier otra columna que uses como variable)
+
+# Directorio para guardar los registros diarios
+REGISTROS_DIARIOS_DIR = 'registros_diarios'
+if not os.path.exists(REGISTROS_DIARIOS_DIR):
+    os.makedirs(REGISTROS_DIARIOS_DIR)
+
+import os
+# ... tus otras variables de ruta
+REGISTROS_DIARIOS_DIR = 'registros_diarios'
+
+# Crea la carpeta si no existe (esto es importante)
+if not os.path.exists(REGISTROS_DIARIOS_DIR):
+    os.makedirs(REGISTROS_DIARIOS_DIR)
+# Importa la librería 'os' si aún no la tienes
+import os
+
+# Rutas a los archivos y carpetas
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+REGISTROS_DIARIOS_DIR = os.path.join(BASE_DIR, 'registros_diarios')
+REGISTROS_DIR = REGISTROS_DIARIOS_DIR # Esta variable también la necesitas
+
+# Rutas de los archivos Excel
+EXCEL_FAP = os.path.join(BASE_DIR, 'ListadoFAPs.xlsx')
+EXCEL_FAO = os.path.join(BASE_DIR, 'ListadoFAOs.xlsx')
+EXCEL_EXCEPCIONES = os.path.join(BASE_DIR, 'excepciones.xlsx')
+
+from flask import Flask, request, jsonify, render_template, redirect, url_for, session, send_from_directory
+import pandas as pd
+from datetime import datetime, timedelta # Importamos timedelta
+import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+
+app = Flask(__name__)
+app.secret_key = 'tu_clave_secreta_aqui' # ¡CAMBIA ESTO POR UNA CADENA ALEATORIA LARGA Y SEGURA!
+
+# --- Configuración ---
+# RUTAS DE TUS ARCHIVOS EXCEL FUENTE
+EXCEL_FAP = 'ListadoFAPs.xlsx' # Archivo de autorizaciones FAP
+EXCEL_FAO = 'ListadoFAOs.xlsx' # Archivo de autorizaciones FAO
+EXCEL_EXCEPCIONES = 'excepciones.xlsx' # Archivo para autorizaciones excepcionales
+
+# CARPETA PARA GUARDAR LOS REGISTROS DIARIOS DE INGRESOS
+REGISTROS_DIARIOS_DIR = 'registros_diarios'
+
+# Rutas a los archivos y carpetas
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+REGISTROS_DIARIOS_DIR = os.path.join(BASE_DIR, 'registros_diarios')
+REGISTROS_DIR = REGISTROS_DIARIOS_DIR # O la ruta que corresponda si son diferentes
+
+# Configuración de Login
+ADMIN_USERNAME = 'admin' # Nombre de usuario para el login
+ADMIN_PASSWORD = 'password123' # ¡CAMBIA ESTO POR UNA CONTRASEÑA SEGURA!
+
+# Configuración de Email (¡ACTUALIZA CON TUS DATOS!)
+EMAIL_SENDER = 'tu_email@example.com' # Tu dirección de correo
+EMAIL_PASSWORD = 'tu_contraseña_de_aplicacion' # ¡Usa una contraseña de aplicación si tu proveedor lo permite!
+EMAIL_RECEIVER = 'email_destino@example.com' # Email al que se enviará el reporte
+SMTP_SERVER = 'smtp.gmail.com' # Por ejemplo, para Gmail
+SMTP_PORT = 587 # Puerto para TLS/STARTTLS (común para Gmail)
+
+# --- Nombres de Columnas en tus Excels fuente (¡CRÍTICO: Deben coincidir exactamente!)
+# # FAP (Archivo FAP.xlsx, encabezados en la fila 2)
+COL_DNI_FAP = 'Numero'
+COL_NOMBRE_FAP = 'Nombre' # O 'Nombre, Apellido' si usas ambos
+COL_APELLIDO_FAP = 'Apellido' # Agregar esta constante
+COL_NUM_PERMISO_FAP = 'FAP' # O 'Num_Permiso' según el Excel
+COL_FECHA_INICIO_FAP = 'Fecha Inicio'
+COL_FECHA_FIN_FAP = 'Fecha Fin' # Usar 'Fecha Fin' o 'Vence' según tu Excel. En el Excel es 'Fecha Fin'
+COL_LOCAL_FAP = 'Local' # En tu excel es 'Local' no 'Marca'
+
+# FAO (Archivo FAO.xlsx, encabezados en la fila 2)
+COL_DNI_FAO = 'Numero'
+COL_NOMBRE_FAO = 'Nombre' # O 'Nombre, Apellido' si usas ambos
+COL_APELLIDO_FAO = 'Apellido' # Agregar esta constante
+COL_NUM_PERMISO_FAO = 'FAO'
+COL_FECHA_INICIO_FAO = 'Fecha Inicio'
+COL_FECHA_FIN_FAO = 'Fecha Fin'
+COL_LOCAL_FAO = 'Local'
+COL_TAREA_FAO = 'Tarea' # En tu excel se llama 'Tarea'
+
+# Excepciones
+# ... Asegúrate de que los nombres de las columnas para las excepciones también coincidan
+# Variables globales para los DataFrames y las fechas de última modificación
+df_fap = pd.DataFrame() # DataFrame para autorizaciones FAP
+df_fao = pd.DataFrame() # DataFrame para autorizaciones FAO
+df_excepciones = pd.DataFrame() # DataFrame para excepciones
+
+# Fechas de última modificación de los archivos Excel para recarga automática
+ult_mod_fap = 0
+ult_mod_fao = 0
+ult_mod_excepciones = 0
+
+# --- Crear carpetas si no existen ---
+if not os.path.exists(REGISTROS_DIARIOS_DIR):
+    os.makedirs(REGISTROS_DIARIOS_DIR)
+
+# --- Funciones Auxiliares ---
+
+def cargar_autorizaciones():
+    """
+    Carga los DataFrames de autorizaciones FAP, FAO y excepciones desde los archivos Excel.
+    Recarga solo si el archivo ha sido modificado.
+    """
+    global df_fap, df_fao, ult_mod_fap, ult_mod_fao, df_excepciones, ult_mod_excepciones
+
+    print("\n--- Cargando autorizaciones ---")
+    print(f"Ruta FAP: {EXCEL_FAP}")
+    print(f"Ruta FAO: {EXCEL_FAO}")
+    print(f"Ruta Excepciones: {EXCEL_EXCEPCIONES}")
+
+    # Cargar FAP
+    try:
+        fap_mod_time = os.path.getmtime(EXCEL_FAP)
+        if fap_mod_time > ult_mod_fap:
+            df_fap_temp = pd.read_excel(EXCEL_FAP, header=1)
+            # --- Corrección para 'Numero' (ya estaba robusta) y renombre de columnas ---
+            df_fap_temp[COL_DNI_FAP] = pd.to_numeric(df_fap_temp[COL_DNI_FAP], errors='coerce').astype(pd.Int64Dtype())
+            df_fap = df_fap_temp.rename(columns={
+                COL_DNI_FAP: 'DNI', # Renombra 'Numero' a 'DNI'
+                COL_NOMBRE_FAP: 'Nombre y Apellido', # Renombra 'Nombre, Apellido' a 'Nombre y Apellido'
+                COL_NUM_PERMISO_FAP: 'Num_Permiso',
+                COL_FECHA_INICIO_FAP: 'Fecha_Inicio',
+                COL_FECHA_FIN_FAP: 'Vence', # <-- Corregido para que 'Fecha Fin' se llame 'Vence'
+                COL_LOCAL_FAP: 'Local'
+            })
+            if 'Tipo de Permiso' not in df_fap.columns: df_fap['Tipo de Permiso'] = 'FAP'
+            if 'Tarea' not in df_fap.columns: df_fap['Tarea'] = 'N/A'
+
+            df_fap['Vence'] = pd.to_datetime(df_fap['Vence'], format='%d/%m/%Y', errors='coerce')
+            df_fap = df_fap.dropna(subset=['DNI', 'Vence'])
+            ult_mod_fap = fap_mod_time
+            print(f"FAP cargado. Columnas internas: {df_fap.columns.tolist()}. Primeros 5 filas:\n{df_fap.head()}")
+    except FileNotFoundError:
+        print(f"Advertencia: Archivo FAP '{EXCEL_FAP}' no encontrado. Se creará un DataFrame vacío.")
+        df_fap = pd.DataFrame(columns=['DNI', 'Nombre y Apellido', 'Tipo de Permiso', 'Num_Permiso', 'Local', 'Tarea', 'Vence', 'Fecha_Inicio'])
+    except Exception as e:
+        print(f"Error al cargar FAP desde '{EXCEL_FAP}': {e}")
+        df_fap = pd.DataFrame(columns=['DNI', 'Nombre y Apellido', 'Tipo de Permiso', 'Num_Permiso', 'Local', 'Tarea', 'Vence', 'Fecha_Inicio'])
+
+    # Cargar FAO
+    try:
+        fao_mod_time = os.path.getmtime(EXCEL_FAO)
+        if fao_mod_time > ult_mod_fao:
+            df_fao_temp = pd.read_excel(EXCEL_FAO, header=1)
+            # --- Corrección para 'Numero' (ya estaba robusta) y renombre de columnas ---
+            df_fao_temp[COL_DNI_FAO] = pd.to_numeric(df_fao_temp[COL_DNI_FAO], errors='coerce').astype(pd.Int64Dtype())
+            df_fao = df_fao_temp.rename(columns={
+                COL_DNI_FAO: 'DNI',
+                COL_NOMBRE_FAO: 'Nombre y Apellido',
+                COL_NUM_PERMISO_FAO: 'Num_Permiso',
+                COL_FECHA_INICIO_FAO: 'Fecha_Inicio',
+                COL_FECHA_FIN_FAO: 'Vence', # <-- Corregido para que 'Fecha Fin' se llame 'Vence'
+                COL_LOCAL_FAO: 'Local',
+                COL_TAREA_FAO: 'Tarea'
+            })
+            if 'Tipo de Permiso' not in df_fao.columns: df_fao['Tipo de Permiso'] = 'FAO'
+
+            df_fao['Vence'] = pd.to_datetime(df_fao['Vence'], format='%d/%m/%Y', errors='coerce')
+            df_fao = df_fao.dropna(subset=['DNI', 'Vence'])
+            ult_mod_fao = fao_mod_time
+            print(f"FAO cargado. Columnas internas: {df_fao.columns.tolist()}. Primeros 5 filas:\n{df_fao.head()}")
+    except FileNotFoundError:
+        print(f"Advertencia: Archivo FAO '{EXCEL_FAO}' no encontrado. Se creará un DataFrame vacío.")
+        df_fao = pd.DataFrame(columns=['DNI', 'Nombre y Apellido', 'Tipo de Permiso', 'Num_Permiso', 'Local', 'Tarea', 'Vence', 'Fecha_Inicio'])
+    except Exception as e:
+        print(f"Error al cargar FAO desde '{EXCEL_FAO}': {e}")
+        df_fao = pd.DataFrame(columns=['DNI', 'Nombre y Apellido', 'Tipo de Permiso', 'Num_Permiso', 'Local', 'Tarea', 'Vence', 'Fecha_Inicio'])
+
+    # Cargar Excepciones
+    try:
+        if os.path.exists(EXCEL_EXCEPCIONES):
+            excepciones_mod_time = os.path.getmtime(EXCEL_EXCEPCIONES)
+            if excepciones_mod_time > ult_mod_excepciones:
+                df_excepciones_temp = pd.read_excel(EXCEL_EXCEPCIONES)
+                # --- Correcciones de nombres de columna para Excepciones ---
+                df_excepciones_temp['Numero'] = pd.to_numeric(df_excepciones_temp['Numero'], errors='coerce').astype(pd.Int64Dtype())
+                df_excepciones = df_excepciones_temp.rename(columns={
+                    'Numero': 'DNI', # <-- Corregido: Renombra 'Numero' a 'DNI'
+                    'Nombre Completo': 'Nombre y Apellido',
+                    'Nombre': 'Nombre',
+                    'Apellido': 'Apellido',
+                    'Local': 'Local', # <-- Asumo que 'Local' en el Excel es 'Lugar' en tu código
+                    'Quien Autoriza': 'Quien_Autoriza',
+                    'Fecha de Alta': 'Vence', # <-- Corregido: Renombra 'Fecha de Alta' a 'Vence'
+                    'Lugar': 'Lugar' # Aseguramos que 'Lugar' exista si es necesario
+                })
+                df_excepciones['Vence'] = pd.to_datetime(df_excepciones['Vence'], errors='coerce')
+                df_excepciones = df_excepciones.dropna(subset=['DNI', 'Vence'])
+                ult_mod_excepciones = excepciones_mod_time
+                print(f"Excepciones cargadas. Columnas internas: {df_excepciones.columns.tolist()}. Primeros 5 filas:\n{df_excepciones.head()}")
+        else:
+            df_excepciones = pd.DataFrame(columns=['Nombre', 'Apellido', 'DNI', 'Lugar', 'Quien_Autoriza', 'Fecha_Autorizacion', 'Vence'])
+            print(f"Archivo de excepciones '{EXCEL_EXCEPCIONES}' no encontrado. Se creará un DataFrame vacío.")
+    except Exception as e:
+        print(f"Error al cargar excepciones desde '{EXCEL_EXCEPCIONES}': {e}")
+        df_excepciones = pd.DataFrame(columns=['Nombre', 'Apellido', 'DNI', 'Lugar', 'Quien_Autoriza', 'Fecha_Autorizacion', 'Vence'])
+
+    print("--- Carga de autorizaciones finalizada ---")
+
+def guardar_registro(dni, nombre, hora_ingreso, tipo_permiso, num_permiso, local, tarea, resultado):
+    # El resto del código de la función
+    now = datetime.now() # <-- Esta línea ya no es necesaria si pasas la hora
+    fecha_hora = hora_ingreso # <-- Usa el argumento que recibes
+    fecha_solo = now.strftime('%Y-%m-%d')
+    """Guarda un registro de ingreso en el archivo Excel del día actual."""
+    if not os.path.exists(REGISTROS_DIARIOS_DIR):
+        os.makedirs(REGISTROS_DIARIOS_DIR) # Crea la carpeta si no existe
+
+    fecha_actual_str = datetime.now().strftime('%Y-%m-%d')
+    nombre_archivo_registro_diario = os.path.join(REGISTROS_DIARIOS_DIR, f'registros_ingreso_{fecha_actual_str}.xlsx')
+
+    # Columnas esperadas para el archivo de registro diario
+    columnas_registro = [
+        'DNI', 'Nombre y Apellido', 'Hora_Ingreso', 'Tipo_Permiso',
+        'Num_Permiso', 'Local', 'Tarea', 'Resultado'
+    ]
+
+    # Crear un nuevo registro
+    nuevo_registro_df = pd.DataFrame([{
+        'DNI': dni,
+        'Nombre y Apellido': nombre,
+        'Hora_Ingreso': hora_ingreso,
+        'Tipo_Permiso': tipo_permiso,
+        'Num_Permiso': num_permiso,
+        'Local': local,
+        'Tarea': tarea,
+        'Resultado': resultado
+    }], columns=columnas_registro)
+
+    df_registros_diarios = pd.DataFrame()
+
+    if os.path.exists(nombre_archivo_registro_diario):
+        try:
+            df_registros_diarios = pd.read_excel(nombre_archivo_registro_diario)
+            # Asegurarse de que el DNI en el archivo de registro se lea como int
+            if 'DNI' in df_registros_diarios.columns:
+                df_registros_diarios['DNI'] = pd.to_numeric(df_registros_diarios['DNI'], errors='coerce').fillna(0).astype(int)
+        except Exception as e:
+            print(f"Error al leer el archivo de registros diarios existente: {e}")
+            df_registros_diarios = pd.DataFrame(columns=columnas_registro)
+    else:
+        print(f"Creando nuevo archivo de registro diario: {nombre_archivo_registro_diario}")
+
+    # Concatenar el nuevo registro
+    df_registros_diarios = pd.concat([df_registros_diarios, nuevo_registro_df], ignore_index=True)
+
+    try:
+        df_registros_diarios.to_excel(nombre_archivo_registro_diario, index=False)
+        print(f"Registro guardado exitosamente en '{nombre_archivo_registro_diario}'")
+    except Exception as e:
+        print(f"Error al guardar el registro en Excel: {e}")    
+
+def cargar_datos_excel(filepath, header_row=1): # header_row=1 significa que los encabezados están en la fila 2 (0-indexed)
+    """Carga un archivo Excel y devuelve un DataFrame de pandas, saltando la primera fila."""
+    try:
+        df = pd.read_excel(filepath, header=header_row) # Carga los encabezados de la fila 2
+        # Convertir la columna DNI a tipo string para asegurar comparación correcta
+        if COL_DNI_FAP in df.columns: # Asumimos el mismo nombre de columna DNI para FAP/FAO
+            df[COL_DNI_FAP] = df[COL_DNI_FAP].astype(str)
+        return df
+    except FileNotFoundError:
+        print(f"Advertencia: El archivo {filepath} no fue encontrado.")
+        return pd.DataFrame() # Devuelve un DataFrame vacío si el archivo no existe
+    except Exception as e:
+        print(f"Error al cargar el archivo {filepath}: {e}")
+        return pd.DataFrame()
+
+def guardar_registro(dni, nombre, hora_ingreso, tipo_permiso, num_permiso, local, tarea, resultado):
+    """Guarda un registro de ingreso en el archivo Excel de registros diarios."""
+    
+    # 1. Definir la fecha y el nombre del archivo. Estas líneas faltaban o estaban mal ubicadas.
+    now = datetime.now()
+    fecha_hora = now.strftime('%Y-%m-%d %H:%M:%S')
+    fecha_solo = now.strftime('%Y-%m-%d')
+
+    # 2. Aquí es donde se crea la variable que faltaba.
+    # Asegúrate de que 'REGISTROS_DIARIOS_DIR' esté definida como una variable global al inicio del archivo.
+    nombre_archivo_registro_diario = os.path.join(REGISTROS_DIARIOS_DIR, f'registros_ingreso_{fecha_solo}.xlsx')
+
+    # Nuevo registro
+    nuevo_registro = pd.DataFrame([{
+        'DNI': str(dni),
+        'Nombre': nombre,
+        'Hora_Ingreso': fecha_hora, # Usamos la hora que acabamos de generar
+        'Tipo_Permiso': tipo_permiso,
+        'Num_Permiso': num_permiso,
+        'Local': local,
+        'Tarea': tarea,
+        'Resultado': resultado
+    }])
+
+    # 3. Ahora que la variable existe, esta parte del código funcionará.
+    # Cargar el archivo existente o crear uno nuevo
+    if os.path.exists(nombre_archivo_registro_diario):
+        df_registros = cargar_datos_excel(nombre_archivo_registro_diario, header_row=0)
+        df_registros = pd.concat([df_registros, nuevo_registro], ignore_index=True)
+    else:
+        df_registros = nuevo_registro
+
+    # Guardar en Excel
+    try:
+        df_registros.to_excel(nombre_archivo_registro_diario, index=False)
+        print(f"Registro guardado exitosamente en {nombre_archivo_registro_diario}")
+    except Exception as e:
+        # El error [Errno 13] ocurre si el archivo está abierto.
+        print(f"Error al guardar el registro en Excel: {e}")
+
+def enviar_email(archivo_adjunto=None):
+    """Envía el reporte diario por correo electrónico."""
+    msg = MIMEMultipart()
+    msg['From'] = EMAIL_SENDER
+    msg['To'] = EMAIL_RECEIVER
+    msg['Subject'] = f"Reporte Diario de Admisión - {datetime.now().strftime('%Y-%m-%d')}"
+
+    body = "Adjunto el reporte diario de admisiones."
+    msg.attach(MIMEText(body, 'plain'))
+
+    if archivo_adjunto and os.path.exists(archivo_adjunto):
+        try:
+            with open(archivo_adjunto, 'rb') as f:
+                part = MIMEBase('application', 'octet-stream')
+                part.set_payload(f.read())
+            encoders.encode_base64(part)
+            part.add_header('Content-Disposition', f'attachment; filename={os.path.basename(archivo_adjunto)}')
+            msg.attach(part)
+            # print(f"Archivo adjunto: {archivo_adjunto}")
+        except Exception as e:
+            print(f"Error al adjuntar archivo: {e}")
+
+    try:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls() # Habilitar seguridad TLS
+            server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+            text = msg.as_string()
+            server.sendmail(EMAIL_SENDER, EMAIL_RECEIVER, text)
+        print("Correo enviado exitosamente.")
+        return True
+    except smtplib.SMTPAuthenticationError:
+        print("Error de autenticación SMTP. Revisa tu email y contraseña (o contraseña de aplicación).")
+        return False
+    except Exception as e:
+        print(f"Error al enviar el correo: {e}")
+        return False
+
+# --- Rutas de Flask ---
+
+@app.route('/')
+def home():
+    """Sirve la página de inicio (Admisión)."""
+    return render_template('index.html')
+
+@app.route('/login')
+def login_page():
+    """Sirve la página de login."""
+    return render_template('login.html')
+
+@app.route('/admin')
+def admin_page():
+    """Sirve la página de administración (requiere login)."""
+    if 'logged_in' in session and session['logged_in']:
+        return render_template('admin.html')
+    return redirect(url_for('login_page'))
+
+#@app.route('/<path:filename>')
+#def serve_static(filename):
+ #   """Sirve archivos estáticos como CSS y JS."""
+  #  return send_from_directory('.', filename)
+
+@app.route('/perform_login', methods=['POST'])
+def perform_login():
+    """Maneja la lógica de inicio de sesión."""
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+
+    if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+        session['logged_in'] = True
+        return jsonify({'success': True})
+    else:
+        return jsonify({'success': False, 'message': 'Usuario o contraseña incorrectos.'})
+
+@app.route('/logout')
+def logout():
+    """Cierra la sesión del usuario."""
+    session.pop('logged_in', None)
+    return redirect(url_for('login_page'))
+
+# app.py
+
+@app.route('/verificar_dni', methods=['POST'])
+def verificar_dni():
+    """Recibe un DNI, lo verifica contra FAP, FAO y Excepciones, y devuelve el resultado."""
+    data = request.get_json()
+    dni_ingresado_str = str(data.get('dni')).strip()
+    
+    cargar_autorizaciones() # Asegura que las listas estén cargadas
+    
+    now = datetime.now().date()
+    hora_actual = datetime.now().strftime('%H:%M:%S')
+
+    print(f"\n--- Iniciando verificación para DNI: '{dni_ingresado_str}' ---")
+
+    # Inicializar variables de respuesta
+    nombre = 'No Encontrado'
+    tipo_permiso = 'N/A'
+    num_permiso = 'N/A'
+    local = 'N/A'
+    tarea = 'N/A'
+    vence = 'N/A'
+    permitido = False
+    mensaje = 'ACCESO DENEGADO: DNI no encontrado en listas autorizadas o vencido.'
+    es_excepcion = False
+
+    # Validar formato del DNI
+    try:
+        dni_para_busqueda = int(dni_ingresado_str)
+        print(f"DNI convertido a entero para búsqueda: {dni_para_busqueda}")
+    except ValueError:
+        mensaje = "Formato de DNI inválido. Ingrese solo números."
+        guardar_registro(dni_ingresado_str, 'N/A', hora_actual, 'N/A', 'N/A', 'N/A', 'N/A', 'ROJO')
+        return jsonify({
+            'acceso': 'DENEGADO', 'nombre': 'N/A', 'mensaje': mensaje,
+            'tipo_permiso': 'N/A', 'num_permiso': 'N/A', 'local': 'N/A',
+            'tarea': 'N/A', 'vence': 'N/A', 'es_excepcion': False
+        })
+
+    # --- 1. Verificar en lista de excepciones ---
+    if not df_excepciones.empty and 'DNI' in df_excepciones.columns:
+        excepcion_match = df_excepciones[df_excepciones['DNI'].astype(str) == str(dni_para_busqueda)]
+        if not excepcion_match.empty:
+            excepcion = excepcion_match.iloc[0]
+            nombre = str(excepcion.get('Nombre y Apellido', f"{excepcion.get('Nombre', '')} {excepcion.get('Apellido', '')}")).strip()
+            local = str(excepcion.get('Local', 'N/A'))
+            vence_val = excepcion.get('Vence')
+            
+            if pd.notna(vence_val):
+                fecha_vencimiento_excepcion = pd.to_datetime(vence_val).date()
+                if now <= fecha_vencimiento_excepcion:
+                    permitido = True
+                    es_excepcion = True
+                    vence = fecha_vencimiento_excepcion.strftime('%Y-%m-%d')
+                    mensaje = f'ACCESO PERMITIDO (Excepción): {nombre}'
+                else:
+                    mensaje = f'ACCESO DENEGADO: Excepción vencida el {fecha_vencimiento_excepcion.strftime("%Y-%m-%d")}.'
+                    vence = fecha_vencimiento_excepcion.strftime('%Y-%m-%d')
+            else: # Sin vencimiento definido
+                permitido = True
+                es_excepcion = True
+                vence = 'N/A (Sin vencimiento)'
+                mensaje = f'ACCESO PERMITIDO (Excepción): {nombre}'
+            
+            # Guardar el registro y devolver la respuesta (se detiene aquí)
+            guardar_registro(dni_ingresado_str, nombre, hora_actual, 'Excepcion', 'N/A', local, 'N/A', 'VERDE' if permitido else 'ROJO')
+            
+            return jsonify({
+                'acceso': 'PERMITIDO' if permitido else 'DENEGADO', 'nombre': nombre, 'mensaje': mensaje,
+                'tipo_permiso': 'Excepcion', 'num_permiso': 'N/A', 'local': local,
+                'tarea': 'N/A', 'vence': vence, 'es_excepcion': es_excepcion
+            })
+
+    # --- 2. Verificar en lista FAP (solo si no se encontró en excepciones) ---
+    if not permitido and not df_fap.empty and 'DNI' in df_fap.columns:
+        fap_match = df_fap[df_fap['DNI'].astype(str) == str(dni_para_busqueda)]
+        if not fap_match.empty:
+            persona_fap = fap_match.iloc[0]
+            nombre = str(persona_fap.get('Nombre', '')) + " " + str(persona_fap.get('Apellido', '')).strip()
+            tipo_permiso = str(persona_fap.get('Tipo de Permiso', 'N/A'))
+            num_permiso = str(persona_fap.get('Num_Permiso', 'N/A'))
+            local = str(persona_fap.get('Local', 'N/A'))
+            tarea = str(persona_fap.get('Tarea', 'N/A'))
+            vence_val = persona_fap.get('Vence')
+            
+            if pd.notna(vence_val):
+                fecha_vencimiento_fap = pd.to_datetime(vence_val).date()
+                if now <= fecha_vencimiento_fap:
+                    permitido = True
+                    mensaje = f'ACCESO PERMITIDO (FAP): {nombre}'
+                    vence = fecha_vencimiento_fap.strftime('%Y-%m-%d')
+                else:
+                    mensaje = f'ACCESO DENEGADO: Permiso FAP vencido el {fecha_vencimiento_fap.strftime("%Y-%m-%d")}.'
+                    vence = fecha_vencimiento_fap.strftime('%Y-%m-%d')
+            else:
+                mensaje = 'ACCESO DENEGADO: Permiso FAP con fecha de vencimiento inválida o no definida.'
+                
+            # Guardar el registro y devolver la respuesta (se detiene aquí)
+            guardar_registro(dni_ingresado_str, nombre, hora_actual, tipo_permiso, num_permiso, local, tarea, 'VERDE' if permitido else 'ROJO')
+            
+            return jsonify({
+                'acceso': 'PERMITIDO' if permitido else 'DENEGADO', 'nombre': nombre, 'mensaje': mensaje,
+                'tipo_permiso': tipo_permiso, 'num_permiso': num_permiso, 'local': local,
+                'tarea': tarea, 'vence': vence, 'es_excepcion': False
+            })
+
+    # --- 3. Verificar en lista FAO (solo si no se encontró en las anteriores) ---
+    if not permitido and not df_fao.empty and 'DNI' in df_fao.columns:
+        fao_match = df_fao[df_fao['DNI'].astype(str) == str(dni_para_busqueda)]
+        if not fao_match.empty:
+            persona_fao = fao_match.iloc[0]
+            nombre = str(persona_fao.get('Nombre', '')) + " " + str(persona_fao.get('Apellido', '')).strip()
+            tipo_permiso = str(persona_fao.get('Tipo de Permiso', 'N/A'))
+            num_permiso = str(persona_fao.get('Num_Permiso', 'N/A'))
+            local = str(persona_fao.get('Local', 'N/A'))
+            tarea = str(persona_fao.get('Tarea', 'N/A'))
+            vence_val = persona_fao.get('Vence')
+            
+            if pd.notna(vence_val):
+                fecha_vencimiento_fao = pd.to_datetime(vence_val).date()
+                if now <= fecha_vencimiento_fao:
+                    permitido = True
+                    mensaje = f'ACCESO PERMITIDO (FAO): {nombre}'
+                    vence = fecha_vencimiento_fao.strftime('%Y-%m-%d')
+                else:
+                    mensaje = f'ACCESO DENEGADO: Permiso FAO vencido el {fecha_vencimiento_fao.strftime("%Y-%m-%d")}.'
+                    vence = fecha_vencimiento_fao.strftime('%Y-%m-%d')
+            else:
+                mensaje = 'ACCESO DENEGADO: Permiso FAO con fecha de vencimiento inválida o no definida.'
+
+            # Guardar el registro y devolver la respuesta (se detiene aquí)
+            guardar_registro(dni_ingresado_str, nombre, hora_actual, tipo_permiso, num_permiso, local, tarea, 'VERDE' if permitido else 'ROJO')
+            
+            return jsonify({
+                'acceso': 'PERMITIDO' if permitido else 'DENEGADO', 'nombre': nombre, 'mensaje': mensaje,
+                'tipo_permiso': tipo_permiso, 'num_permiso': num_permiso, 'local': local,
+                'tarea': tarea, 'vence': vence, 'es_excepcion': False
+            })
+
+    # --- 4. Si no se encontró en ninguna lista, es denegado ---
+    # Se genera un registro de denegación con los datos de inicialización
+    guardar_registro(dni_ingresado_str, nombre, hora_actual, tipo_permiso, num_permiso, local, tarea, 'ROJO')
+    
+    # Devolver la respuesta final denegada
+    return jsonify({
+        'acceso': 'DENEGADO', 'nombre': nombre, 'mensaje': mensaje,
+        'tipo_permiso': tipo_permiso, 'num_permiso': num_permiso, 'local': local,
+        'tarea': tarea, 'vence': vence, 'es_excepcion': es_excepcion
+    })
+@app.route('/upload_excel', methods=['POST'])
+def upload_excel():
+    """Maneja la subida de archivos Excel FAP y FAO."""
+    if 'logged_in' not in session or not session['logged_in']:
+        return jsonify({'success': False, 'message': 'No autorizado.'}), 403
+
+    if 'fap_file' not in request.files and 'fao_file' not in request.files:
+        return jsonify({'success': False, 'message': 'No se encontró ningún archivo.'})
+
+    uploaded_fap = request.files.get('fap_file')
+    uploaded_fao = request.files.get('fao_file')
+
+    messages = []
+    success = True
+
+    # Procesar FAP
+    if uploaded_fap and uploaded_fap.filename != '':
+        try:
+            uploaded_fap.save(EXCEL_FAP)
+            # Intentar cargar para verificar que el formato sea correcto
+            df_test = cargar_datos_excel(EXCEL_FAP)
+            if df_test.empty and uploaded_fap.tell() > 0: # Si está vacío pero el archivo no lo estaba, es un error de formato
+                 raise ValueError("El archivo FAP cargado está vacío o tiene un formato incorrecto.")
+            messages.append(f'Archivo {EXCEL_FAP} cargado exitosamente.')
+        except Exception as e:
+            messages.append(f'Error al cargar {EXCEL_FAP}: {e}')
+            success = False
+    elif uploaded_fap and uploaded_fap.filename == '':
+        messages.append('No se seleccionó archivo FAP.')
+
+    # Procesar FAO
+    if uploaded_fao and uploaded_fao.filename != '':
+        try:
+            uploaded_fao.save(EXCEL_FAO)
+            # Intentar cargar para verificar que el formato sea correcto
+            df_test = cargar_datos_excel(EXCEL_FAO)
+            if df_test.empty and uploaded_fao.tell() > 0: # Si está vacío pero el archivo no lo estaba, es un error de formato
+                 raise ValueError("El archivo FAO cargado está vacío o tiene un formato incorrecto.")
+            messages.append(f'Archivo {EXCEL_FAO} cargado exitosamente.')
+        except Exception as e:
+            messages.append(f'Error al cargar {EXCEL_FAO}: {e}')
+            success = False
+    elif uploaded_fao and uploaded_fao.filename == '':
+        messages.append('No se seleccionó archivo FAO.')
+
+    return jsonify({'success': success, 'message': ' '.join(messages)})
+
+
+@app.route('/add_excepcion', methods=['POST'])
+def add_excepcion():
+    """Agrega una persona a la lista de excepciones."""
+    if 'logged_in' not in session or not session['logged_in']:
+        return jsonify({'success': False, 'message': 'No autorizado.'}), 403
+
+    data = request.get_json()
+    nombre = data.get('nombre').strip()
+    apellido = data.get('apellido').strip()
+    dni = str(data.get('dni')).strip()
+    local = data.get('local').strip()
+    quien_autoriza = data.get('quien_autoriza').strip()
+
+    if not all([nombre, apellido, dni, local, quien_autoriza]):
+        return jsonify({'success': False, 'message': 'Todos los campos de excepción son obligatorios.'})
+
+    nombre_completo = f"{nombre} {apellido}"
+
+    # Cargar el archivo de excepciones o crear uno nuevo
+    try:
+        if os.path.exists(EXCEL_EXCEPCIONES):
+            df_excepciones = pd.read_excel(EXCEL_EXCEPCIONES)
+        else:
+            df_excepciones = pd.DataFrame(columns=[
+                COL_DNI_FAP, 'Nombre Completo', 'Nombre', 'Apellido', 'Local', 'Quien Autoriza', 'Fecha de Alta'
+            ]) # COL_DNI_FAP para el DNI en excepciones
+    except Exception as e:
+        print(f"Error al cargar/crear excepciones.xlsx: {e}")
+        df_excepciones = pd.DataFrame(columns=[
+            COL_DNI_FAP, 'Nombre Completo', 'Nombre', 'Apellido', 'Local', 'Quien Autoriza', 'Fecha de Alta'
+        ])
+
+    # Convertir DNI de excepciones a string para asegurar consistencia
+    if COL_DNI_FAP in df_excepciones.columns:
+        df_excepciones[COL_DNI_FAP] = df_excepciones[COL_DNI_FAP].astype(str)
+
+    # Crear el nuevo registro
+    nuevo_excepcion = pd.DataFrame([{
+        COL_DNI_FAP: dni,
+        'Nombre Completo': nombre_completo,
+        'Nombre': nombre,
+        'Apellido': apellido,
+        'Local': local,
+        'Quien Autoriza': quien_autoriza,
+        'Fecha de Alta': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }])
+
+    df_excepciones = pd.concat([df_excepciones, nuevo_excepcion], ignore_index=True)
+
+    try:
+        df_excepciones.to_excel(EXCEL_EXCEPCIONES, index=False)
+        return jsonify({'success': True, 'message': 'Excepción agregada exitosamente.'})
+    except Exception as e:
+        print(f"Error al guardar excepción: {e}")
+        return jsonify({'success': False, 'message': f'Error al guardar la excepción: {e}'})
+
+# Suponiendo que esta es tu función para obtener los registros
+# Asegúrate de que esta función está definida una sola vez en tu código
+# En tu archivo app.py
+
+# ... (tus imports y otras funciones) ...
+
+@app.route('/get_daily_records')
+def get_daily_records():
+    """Lee y devuelve los registros de acceso del día en formato JSON."""
+    now = datetime.now()
+    fecha_solo = now.strftime('%Y-%m-%d')
+    nombre_archivo_registro_diario = os.path.join(REGISTROS_DIARIOS_DIR, f'registros_ingreso_{fecha_solo}.xlsx')
+
+    if not os.path.exists(nombre_archivo_registro_diario):
+        print("El archivo de registros diarios no existe para hoy. Devolviendo lista vacía.")
+        return jsonify({
+            'success': True,
+            'message': 'No hay registros para mostrar.',
+            'records': []
+        })
+
+    try:
+        # Carga el archivo Excel
+        df_registros = pd.read_excel(nombre_archivo_registro_diario)
+
+        # --- MODIFICACIÓN CLAVE: RELLENAR VALORES NaN ---
+        # Reemplaza todos los valores NaN con una cadena vacía para evitar errores en JSON
+        df_registros = df_registros.fillna('')
+        # También puedes usar df_registros.replace({np.nan: None}) si prefieres 'null' en JSON
+        
+        # Convierte el DataFrame a un formato de lista de diccionarios (JSON)
+        records_list = df_registros.to_dict('records')
+
+        # Devuelve la lista de registros en una respuesta JSON exitosa
+        return jsonify({
+            'success': True,
+            'message': 'Registros cargados exitosamente.',
+            'records': records_list
+        })
+
+    except Exception as e:
+        print(f"Error al leer el archivo de registros diarios: {e}")
+        return jsonify({
+            'success': False,
+            'message': 'Error al cargar los registros.',
+            'records': []
+        }), 500
+
+@app.route('/enviar_reporte_diario', methods=['POST'])
+def enviar_reporte():
+    """Envía el reporte del día por email."""
+    if 'logged_in' not in session or not session['logged_in']:
+        return jsonify({'success': False, 'message': 'No autorizado.'}), 403
+
+    fecha_hoy = datetime.now().strftime('%Y-%m-%d')
+    archivo_a_enviar = os.path.join(REGISTROS_DIARIOS_DIR, f'registros_ingreso_{fecha_hoy}.xlsx')
+
+    if os.path.exists(archivo_a_enviar):
+        if enviar_email(archivo_a_enviar):
+            return jsonify({'success': True, 'message': 'Reporte enviado exitosamente.'})
+        else:
+            return jsonify({'success': False, 'message': 'Error al enviar el reporte. Revisa la consola para más detalles.'})
+    else:
+        return jsonify({'success': False, 'message': 'No hay registros de entradas para hoy.'})
+
+# --- Ejecutar la aplicación ---
+if __name__ == '__main__':
+    # Cargar los datos iniciales al iniciar la aplicación
+    # Es buena práctica llamar a esto dentro de un contexto de aplicación
+    with app.app_context():
+        cargar_autorizaciones()
+
+    # Esto hará que el servidor Flask sea accesible desde tu red local
+    # Si solo quieres que sea accesible desde tu propia PC, usa host='127.0.0.1'
+    app.run(debug=True, host='0.0.0.0', port=5000)
