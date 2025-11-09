@@ -4,19 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Control de Acceso - Panel de Admin</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_style.css') }}">
 </head>
 <body>
     <header class="header">
         <div class="header-left">
             <h2>Panel de Administración</h2>
-            <h3>Alcorta Shopping</h3>
+            <h3>Al Oeste Shopping</h3>
         </div>
         <div class="header-right">
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo Shopping" class="logo">
             <div class="user-info">
                 <span>Administrador</span>
                 <button onclick="window.location.href='/logout'" class="header-button">Cerrar Sesión</button>
@@ -27,16 +25,16 @@
     <div class="main-content">
         <div class="left-panel">
             <div class="admin-section">
-                <h2>Cargar Listas FAP y FAO</h2>
+                <h2><span class="material-icons">upload_file</span>Cargar Listas FAP y FAO</h2>
                 <div class="file-upload-container">
                     <div class="file-input-wrapper">
                         <input type="file" id="fapFileInput" accept=".xlsx" class="file-input-hidden">
-                        <label for="fapFileInput" class="file-upload-label">Seleccionar FAP</label>
+                        <label for="fapFileInput" class="file-upload-label"><span class="material-icons">cloud_upload</span>Seleccionar FAP</label>
                         <span id="fapFileName" class="file-name-display">Ningún archivo seleccionado</span>
                     </div>
                     <div class="file-input-wrapper">
                         <input type="file" id="faoFileInput" accept=".xlsx" class="file-input-hidden">
-                        <label for="faoFileInput" class="file-upload-label">Seleccionar FAO</label>
+                        <label for="faoFileInput" class="file-upload-label"><span class="material-icons">cloud_upload</span>Seleccionar FAO</label>
                         <span id="faoFileName" class="file-name-display">Ningún archivo seleccionado</span>
                     </div>
                 </div>
@@ -45,36 +43,68 @@
             </div>
             
             <div class="admin-section">
-                <h2>Autorizar Excepción</h2>
+                <h2><span class="material-icons">how_to_reg</span>Autorizar Excepción</h2>
                 <form class="excepcion-form" onsubmit="return false;">
-                    <input type="text" id="nombreExcepcion" placeholder="Nombre" autocomplete="off">
-                    <input type="text" id="apellidoExcepcion" placeholder="Apellido" autocomplete="off">
-                    <input type="text" id="dniExcepcion" placeholder="DNI (sin puntos)" autocomplete="off">
-                    <input type="text" id="localExcepcion" placeholder="Local/Marca" autocomplete="off">
-                    <input type="text" id="autorizaExcepcion" placeholder="Quién Autoriza (ej. Gerencia)" autocomplete="off">
+                    <div class="form-row">
+                        <div class="input-group">
+                            <label for="nombreExcepcion">Nombre</label>
+                            <input type="text" id="nombreExcepcion" placeholder="Nombre de la persona">
+                        </div>
+                        <div class="input-group">
+                            <label for="apellidoExcepcion">Apellido</label>
+                            <input type="text" id="apellidoExcepcion" placeholder="Apellido de la persona">
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label for="dniExcepcion">DNI</label>
+                        <input type="text" id="dniExcepcion" placeholder="Documento Nacional de Identidad (sin puntos)">
+                    </div>
+                    <div class="input-group">
+                        <label for="localExcepcion">Local/Marca</label>
+                        <input type="text" id="localExcepcion" placeholder="Local o marca que visita">
+                    </div>
+                    <div class="input-group">
+                        <label for="autorizaExcepcion">Autorizado Por</label>
+                        <input type="text" id="autorizaExcepcion" placeholder="Ej: Gerencia, Seguridad">
+                    </div>
                 </form>
                 <button id="addExcepcionBtn" class="form-button">Guardar Excepción</button>
-                <p id="excepcionStatus" class="status-message"></p>
+                    <p id="excepcionStatus" class="status-message"></p>
+                </div>
+
+                <div class="admin-section">
+                    <h2><span class="material-icons">image</span>Gestión de Logo</h2>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="logoFileInput" accept="image/png, image/jpeg" class="file-input-hidden">
+                        <label for="logoFileInput" class="file-upload-label"><span class="material-icons">cloud_upload</span>Cambiar Logo</label>
+                        <span id="logoFileName" class="file-name-display">Ningún archivo seleccionado</span>
+                    </div>
+                    <button id="uploadLogoBtn" class="form-button">Subir Logo</button>
+                    <button id="deleteLogoBtn" class="form-button delete-button">Eliminar Logo Actual</button>
+                    <p id="logoStatus" class="status-message"></p>
+                </div>
+
             </div>
-        </div>
-        <div class="right-panel">
-            <h2>Listado Diario de Ingresos</h2>
-            <div class="ingresos-list-container">
-                <table class="ingresos-table">
-                    <thead>
-                        <tr>
-                            <th>Hora</th>
-                            <th>DNI</th>
-                            <th>Nombre</th>
-                            <th>Permiso/Autoriza</th>
-                            <th>Local</th>
-                            <th>Tarea</th>
-                        </tr>
-                    </thead>
-                    <tbody id="adminIngresosListBody"></tbody>
-                </table>
-            </div>
+            <div class="right-panel">
+                <h2><span class="material-icons">list_alt</span>Listado Diario de Ingresos</h2>
+                <div class="ingresos-list-container">
+                    <table class="ingresos-table">
+                        <thead>
+                            <tr>
+                                <th>Hora</th>
+                                <th>DNI</th>
+                                <th>Nombre</th>
+                                <th>Permiso/Autoriza</th>
+                                <th>Local</th>
+                                <th>Tarea</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminIngresosListBody"></tbody>
+                    </table>
+                </div>
             <button id="enviarReporteBtn" class="report-button">Enviar Reporte por Email</button>
+            <button id="descargarReporteBtn" class="report-button">Descargar Reporte de Accesos</button>
+            <button id="descargarFichajesBtn" class="report-button">Descargar Reporte de Fichajes</button>
             <p id="reporteStatus" class="status-message"></p>
         </div>
     </div>

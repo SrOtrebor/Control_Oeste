@@ -14,7 +14,7 @@ a = Analysis(['app.py'],
                  ('static', 'static')
              ],
              # AQUÍ AGREGAMOS LIBRERÍAS OCULTAS QUE PANDAS USA
-             hiddenimports=['pandas._libs.tslibs.base'],
+             hiddenimports=['pandas._libs.tslibs.base', 'openpyxl'],
              hookspath=[],
              hooksconfig={},
              runtime_hooks=[],
