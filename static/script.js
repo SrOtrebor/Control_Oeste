@@ -383,89 +383,204 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Carga de Nómina Persistente
         const btnPreviewNomina = document.getElementById('btnPreviewNomina');
-        if (btnPreviewNomina) {
-            btnPreviewNomina.addEventListener('click', async () => {
-                const texto = document.getElementById('nominaTexto').value;
-                const tableDiv = document.getElementById('nominaPreviewTable');
-                const saveBtn = document.getElementById('btnSaveNomina');
+        const btnSaveNomina = document.getElementById('btnSaveNomina');
+        const nominaTexto = document.getElementById('nominaTexto');
+        const previewContainer = document.getElementById('previewNominaContainer');
+        const previewBody = document.getElementById('previewNominaBody');
+        const nominaParseStatus = document.getElementById('nominaParseStatus');
+        const nominaSaveStatus = document.getElementById('nominaSaveStatus');
+        const nominaEmpresa = document.getElementById('nominaEmpresa');
+        const nominaVigenciaDesde = document.getElementById('nominaVigenciaDesde');
+        const nominaVigenciaHasta = document.getElementById('nominaVigenciaHasta');
+        const nominasGuardadasBody = document.getElementById('nominasGuardadasBody');
 
-                try {
-                    const response = await fetch('/parse_nomina', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ texto_pegado: texto })
+        let isUpdateMode = false;
+        let originalNominaData = {};
+
+        async function loadNominasGuardadas() {
+            try {
+                const response = await fetch('/get_nominas_guardadas');
+                const data = await response.json();
+                nominasGuardadasBody.innerHTML = '';
+                if (data.success && data.nominas) {
+                    data.nominas.forEach(n => {
+                        const row = nominasGuardadasBody.insertRow();
+                        row.insertCell().textContent = n.empresa;
+                        row.insertCell().textContent = n.vigencia;
+                        row.insertCell().textContent = n.cantidad_personas; // Celda de cantidad
+                        
+                        const actionsCell = row.insertCell();
+                        const editBtn = document.createElement('button');
+                        editBtn.textContent = 'Editar';
+                        editBtn.classList.add('action-button', 'edit');
+                        editBtn.onclick = () => setupEditMode(n.empresa, n.vigencia);
+                        
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.textContent = 'Borrar';
+                        deleteBtn.classList.add('action-button', 'delete');
+                        deleteBtn.onclick = () => deleteNomina(n.empresa, n.vigencia);
+
+                        actionsCell.appendChild(editBtn); // Añadir botón de editar
+                        actionsCell.appendChild(deleteBtn); // Añadir botón de borrar
                     });
-
-                    if (!response.ok) {
-                        throw new Error(`Error del servidor: ${response.status} ${response.statusText}`);
-                    }
-
-                    const data = await response.json();
-
-                    if (data.success && data.nomina && data.nomina.length > 0) {
-                        let tableHTML = '<table class="ingresos-table"><thead><tr><th>DNI</th><th>Apellido</th><th>Nombre</th></tr></thead><tbody>';
-                        data.nomina.forEach(p => {
-                            tableHTML += `<tr>
-                                <td contenteditable="true">${p.dni || ''}</td>
-                                <td contenteditable="true">${p.apellido || ''}</td>
-                                <td contenteditable="true">${p.nombre || ''}</td>
-                            </tr>`;
-                        });
-                        tableHTML += '</tbody></table>';
-                        tableDiv.innerHTML = tableHTML;
-                        saveBtn.style.display = 'block';
-                    } else {
-                        tableDiv.innerHTML = '<p class="error-message">No se encontraron personas válidas en el texto o el formato es incorrecto.</p>';
-                        saveBtn.style.display = 'none';
-                    }
-                } catch (error) {
-                    console.error('Error al procesar la nómina:', error);
-                    tableDiv.innerHTML = `<p class="error-message">Error al procesar la nómina. Verifique el texto o contacte al administrador. Detalles: ${error.message}</p>`;
-                    saveBtn.style.display = 'none';
-                    alert('Ocurrió un error al intentar procesar el texto de la nómina.');
                 }
-            });
+            } catch (error) {
+                console.error('Error al cargar nóminas guardadas:', error);
+            }
         }
 
-        const btnSaveNomina = document.getElementById('btnSaveNomina');
-        if (btnSaveNomina) {
-            btnSaveNomina.addEventListener('click', async () => {
-                const table = document.getElementById('nominaPreviewTable').querySelector('table');
-                if (!table) return;
+        function renderPreviewTable(personas) {
+            previewBody.innerHTML = '';
+            personas.forEach(p => {
+                const row = previewBody.insertRow();
+                row.insertCell().innerHTML = `<input type="text" value="${p.dni || ''}" class="editable-input">`;
+                row.insertCell().innerHTML = `<input type="text" value="${p.apellido || ''}" class="editable-input">`;
+                row.insertCell().innerHTML = `<input type="text" value="${p.nombre || ''}" class="editable-input">`;
+            });
+            previewContainer.style.display = 'block';
+        }
 
-                const nomina = Array.from(table.querySelectorAll('tbody tr')).map(row => ({
-                    dni: row.cells[0].innerText.trim(),
-                    apellido: row.cells[1].innerText.trim(),
-                    nombre: row.cells[2].innerText.trim()
-                })).filter(p => p.dni); // Solo incluir si hay DNI
-
-                const payload = {
-                    nomina: nomina,
-                    empresa: document.getElementById('nominaEmpresa').value,
-                    vigencia_desde: document.getElementById('nominaDesde').value,
-                    vigencia_hasta: document.getElementById('nominaHasta').value
-                };
-
-                if (!payload.empresa || !payload.vigencia_desde || !payload.vigencia_hasta || nomina.length === 0) {
-                    alert('Por favor, complete Empresa, Vigencias y asegúrese de que la nómina no esté vacía.');
-                    return;
+        btnPreviewNomina.addEventListener('click', async () => {
+            const texto = nominaTexto.value;
+            if (!texto.trim()) {
+                nominaParseStatus.textContent = 'El campo de texto está vacío.';
+                nominaParseStatus.className = 'status-message error';
+                return;
+            }
+            try {
+                const response = await fetch('/parse_nomina', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ texto_pegado: texto })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    renderPreviewTable(data.nomina);
+                    nominaParseStatus.textContent = `Se previsualizaron ${data.nomina.length} personas.`;
+                    nominaParseStatus.className = 'status-message success';
+                } else {
+                    nominaParseStatus.textContent = data.message || 'No se pudo procesar el texto.';
+                    nominaParseStatus.className = 'status-message error';
+                    previewContainer.style.display = 'none';
                 }
+            } catch (error) {
+                console.error('Error al previsualizar:', error);
+                nominaParseStatus.textContent = 'Error de red.';
+                nominaParseStatus.className = 'status-message error';
+            }
+        });
 
+        btnSaveNomina.addEventListener('click', async () => {
+            const nomina = Array.from(previewBody.rows).map(row => ({
+                dni: row.cells[0].querySelector('input').value.trim(),
+                apellido: row.cells[1].querySelector('input').value.trim(),
+                nombre: row.cells[2].querySelector('input').value.trim()
+            })).filter(p => p.dni);
+
+            if (nomina.length === 0) {
+                nominaSaveStatus.textContent = 'La tabla de previsualización está vacía.';
+                nominaSaveStatus.className = 'status-message error';
+                return;
+            }
+
+            const payload = {
+                nomina: nomina,
+                empresa: nominaEmpresa.value,
+                vigencia_desde: nominaVigenciaDesde.value,
+                vigencia_hasta: nominaVigenciaHasta.value,
+                is_update: isUpdateMode,
+                original_empresa: isUpdateMode ? originalNominaData.empresa : null,
+                original_vigencia_desde: isUpdateMode ? originalNominaData.vigencia_desde : null,
+            };
+
+            try {
                 const response = await fetch('/save_nomina', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
                 const data = await response.json();
-                alert(data.message);
-
+                nominaSaveStatus.textContent = data.message;
+                nominaSaveStatus.className = data.success ? 'status-message success' : 'status-message error';
                 if (data.success) {
-                    document.getElementById('nominaTexto').value = '';
-                    document.getElementById('nominaPreviewTable').innerHTML = '';
-                    btnSaveNomina.style.display = 'none';
+                    resetNominaForm();
+                    loadNominasGuardadas();
                 }
-            });
+            } catch (error) {
+                console.error('Error al guardar:', error);
+                nominaSaveStatus.textContent = 'Error de red.';
+                nominaSaveStatus.className = 'status-message error';
+            }
+        });
+
+        async function setupEditMode(empresa, vigencia) {
+            try {
+                const response = await fetch('/get_nomina_detalle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ empresa, vigencia })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    const detalle = data.detalle;
+                    
+                    nominaEmpresa.value = empresa;
+                    nominaVigenciaDesde.value = detalle.vigencia_desde;
+                    nominaVigenciaHasta.value = detalle.vigencia_hasta;
+                    nominaTexto.value = '';
+                    
+                    renderPreviewTable(detalle.personas);
+                    
+                    isUpdateMode = true;
+                    originalNominaData = { empresa, vigencia };
+                    
+                    btnSaveNomina.textContent = 'Actualizar Nómina';
+                    document.getElementById('management-title').textContent = 'Editando Nómina';
+                    window.scrollTo(0, 0);
+                } else {
+                    alert(data.message);
+                }
+            } catch (error) {
+                console.error('Error al cargar para editar:', error);
+            }
         }
+
+        async function deleteNomina(empresa, vigencia) {
+            if (!confirm(`¿Seguro que desea eliminar la nómina de "${empresa}" con vigencia ${vigencia}?`)) return;
+
+            try {
+                const response = await fetch('/delete_nomina', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ empresa, vigencia })
+                });
+                const data = await response.json();
+                alert(data.message);
+                if (data.success) {
+                    loadNominasGuardadas();
+                }
+            } catch (error) {
+                console.error('Error al eliminar:', error);
+                alert('Error de red al intentar eliminar.');
+            }
+        }
+
+        function resetNominaForm() {
+            nominaEmpresa.value = '';
+            nominaVigenciaDesde.value = '';
+            nominaVigenciaHasta.value = '';
+            nominaTexto.value = '';
+            previewContainer.style.display = 'none';
+            previewBody.innerHTML = '';
+            isUpdateMode = false;
+            originalNominaData = {};
+            btnSaveNomina.textContent = 'Guardar Nómina';
+            document.getElementById('management-title').textContent = 'Gestión de Nóminas Persistentes';
+            nominaParseStatus.textContent = '';
+            nominaSaveStatus.textContent = '';
+        }
+
+        loadNominasGuardadas();
 
         // Descargar Reporte Diario
         const descargarReporteBtn = document.getElementById('descargarReporteBtn');
@@ -506,71 +621,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Gestión de Logo
-        const logoFileInput = document.getElementById('logoFileInput');
-        const logoFileName = document.getElementById('logoFileName');
-        const uploadLogoBtn = document.getElementById('uploadLogoBtn');
-        const deleteLogoBtn = document.getElementById('deleteLogoBtn');
-        const logoStatus = document.getElementById('logoStatus');
 
-        if(logoFileInput) {
-            logoFileInput.addEventListener('change', () => {
-                logoFileName.textContent = logoFileInput.files.length > 0 ? logoFileInput.files[0].name : 'Ningún archivo seleccionado';
-            });
-        }
-
-        if(uploadLogoBtn) {
-            uploadLogoBtn.addEventListener('click', async () => {
-                if (logoFileInput.files.length === 0) {
-                    logoStatus.textContent = 'Por favor, seleccione un archivo de imagen.';
-                    logoStatus.className = 'status-message error';
-                    return;
-                }
-
-                const formData = new FormData();
-                formData.append('logoFile', logoFileInput.files[0]);
-
-                try {
-                    const response = await fetch('/upload_logo', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    const data = await response.json();
-                    logoStatus.textContent = data.message;
-                    logoStatus.className = data.success ? 'status-message success' : 'status-message error';
-                    if(data.success) {
-                        setTimeout(() => window.location.reload(), 2000);
-                    }
-                } catch (error) {
-                    console.error('Error al subir el logo:', error);
-                    logoStatus.textContent = 'Error de red al intentar subir el logo.';
-                    logoStatus.className = 'status-message error';
-                }
-            });
-        }
-
-        if(deleteLogoBtn) {
-            deleteLogoBtn.addEventListener('click', async () => {
-                if (!confirm('¿Está seguro de que desea eliminar el logo actual? Esta acción no se puede deshacer.')) {
-                    return;
-                }
-
-                try {
-                    const response = await fetch('/delete_logo', {
-                        method: 'POST',
-                    });
-                    const data = await response.json();
-                    logoStatus.textContent = data.message;
-                    logoStatus.className = data.success ? 'status-message success' : 'status-message error';
-                    if(data.success) {
-                        setTimeout(() => window.location.reload(), 2000);
-                    }
-                } catch (error) {
-                    console.error('Error al eliminar el logo:', error);
-                    logoStatus.textContent = 'Error de red al intentar eliminar el logo.';
-                    logoStatus.className = 'status-message error';
-                }
-            });
-        }
     }
 });

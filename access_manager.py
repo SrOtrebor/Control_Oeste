@@ -129,32 +129,31 @@ def verificar_dni(scanner_data, mode):
         cargar_autorizaciones() 
         
         # --- 1. Verificar en Nóminas Persistentes ---
-        print("\nDEBUG: 1. Verificando en Nóminas...")
-        # --- CORRECCIÓN: ---
-        if not data_manager.df_nominas.empty and COL_DNI in data_manager.df_nominas.columns:
-            match = data_manager.df_nominas[data_manager.df_nominas[COL_DNI] == dni_limpio_str]
+        print("\nDEBUG: 1. Verificando en Nóminas Persistentes...")
+        df_nominas_persistentes = data_manager.get_df_nominas_persistentes()
+        if not df_nominas_persistentes.empty and COL_DNI in df_nominas_persistentes.columns:
+            match = df_nominas_persistentes[df_nominas_persistentes[COL_DNI] == dni_limpio_str]
             if not match.empty:
-                print("   - DNI ENCONTRADO en Nóminas.")
+                print("   - DNI ENCONTRADO en Nóminas Persistentes.")
                 persona = match.iloc[0]
                 desde = persona.get('Vigencia Desde')
                 hasta = persona.get('Vigencia Hasta')
                 if pd.notna(desde) and pd.notna(hasta) and pd.Timestamp(desde) <= hoy <= pd.Timestamp(hasta):
-                    print("   - Vigencia Nómina VÁLIDA. ACCESO PERMITIDO.")
+                    print("   - Vigencia Nómina Persistente VÁLIDA. ACCESO PERMITIDO.")
                     nombre = persona.get(COL_NOMBRE_APELLIDO, 'N/A')
                     local = persona.get(COL_LOCAL, 'N/A')
                     tarea = persona.get(COL_TAREA, 'N/A')
                     vence = pd.Timestamp(hasta).strftime('%d/%m/%Y')
                     personas_adentro.add(dni_limpio_str)
-                    registrar_evento(dni_limpio_str, nombre, hora_actual_str, 'Entrada OK', 'Nomina', 'N/A', local, tarea, 'VERDE')
-                    return {'acceso': 'PERMITIDO', 'nombre': nombre, 'mensaje': f'ACCESO PERMITIDO (Nomina): {nombre}', 'tipo_permiso': 'Nomina', 'num_permiso': 'N/A', 'local': local, 'tarea': tarea, 'vence': vence}
+                    registrar_evento(dni_limpio_str, nombre, hora_actual_str, 'Entrada OK', 'Nomina Persistente', 'N/A', local, tarea, 'VERDE')
+                    return {'acceso': 'PERMITIDO', 'nombre': nombre, 'mensaje': f'ACCESO PERMITIDO (Nomina): {nombre}', 'tipo_permiso': 'Nomina Persistente', 'num_permiso': 'N/A', 'local': local, 'tarea': tarea, 'vence': vence}
                 else:
-                    print(f"   - Permiso encontrado en Nómina pero está vencido o las fechas son inválidas.")
+                    print(f"   - Permiso encontrado en Nómina Persistente pero está vencido o las fechas son inválidas.")
             else:
-                print("   - DNI no encontrado en Nóminas.")
+                print("   - DNI no encontrado en Nóminas Persistentes.")
 
         # --- 2. Verificar en lista FAP ---
         print("\nDEBUG: 2. Verificando en FAP...")
-        # --- CORRECCIÓN: ---
         if not data_manager.df_fap.empty and COL_DNI in data_manager.df_fap.columns:
             match = data_manager.df_fap[data_manager.df_fap[COL_DNI] == dni_limpio_str]
             if not match.empty:
@@ -179,7 +178,6 @@ def verificar_dni(scanner_data, mode):
 
         # --- 3. Verificar en lista FAO ---
         print("\nDEBUG: 3. Verificando en FAO...")
-        # --- CORRECCIÓN: ---
         if not data_manager.df_fao.empty and COL_DNI in data_manager.df_fao.columns:
             match = data_manager.df_fao[data_manager.df_fao[COL_DNI] == dni_limpio_str]
             if not match.empty:
@@ -204,7 +202,6 @@ def verificar_dni(scanner_data, mode):
 
         # --- 4. Verificar en lista de excepciones ---
         print("\nDEBUG: 4. Verificando en Excepciones...")
-        # --- CORRECCIÓN: ---
         if not data_manager.df_excepciones.empty and COL_DNI in data_manager.df_excepciones.columns:
             match = data_manager.df_excepciones[data_manager.df_excepciones[COL_DNI] == dni_limpio_str]
             if not match.empty:
@@ -244,8 +241,9 @@ def registrar_fichaje(scanner_data, mode):
 
     cargar_autorizaciones()
     nombre_completo = parsed_data.get('nombre_completo', 'N/A')
-    # --- CORRECCIÓN: ---
-    persona_nomina = data_manager.df_nominas[data_manager.df_nominas[COL_DNI] == dni]
+    
+    df_nominas_persistentes = data_manager.get_df_nominas_persistentes()
+    persona_nomina = df_nominas_persistentes[df_nominas_persistentes[COL_DNI] == dni]
     if not persona_nomina.empty:
         nombre_completo = persona_nomina.iloc[0].get('Nombre y Apellido', nombre_completo)
     
