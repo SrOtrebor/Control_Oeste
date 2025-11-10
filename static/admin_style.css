@@ -356,3 +356,38 @@ textarea {
     border-top: 1px solid #D1D9E6;
     box-shadow: 0 -2px 5px rgba(0,0,0,0.03);
 }
+
+/* --- Action Buttons in Tables --- */
+.action-button {
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--color-text-light);
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    margin-right: 0.5rem;
+}
+
+.action-button:last-child {
+    margin-right: 0;
+}
+
+.action-button.edit {
+    background-color: var(--color-primary);
+}
+
+.action-button.edit:hover {
+    background-color: #3a7ac8; /* A slightly darker blue */
+    transform: translateY(-1px);
+}
+
+.action-button.delete {
+    background-color: var(--color-danger);
+}
+
+.action-button.delete:hover {
+    background-color: #b80017; /* A slightly darker red */
+    transform: translateY(-1px);
+}
