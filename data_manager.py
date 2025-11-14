@@ -1,8 +1,12 @@
 import os
+import re
 import pandas as pd
 from datetime import datetime
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill, Font, Alignment
 
 from config import (
+    BASE_DIR, REGISTROS_DIARIOS_DIR,
     EXCEL_FAP, EXCEL_FAO, EXCEL_EXCEPCIONES, EXCEL_NOMINAS,
     COL_DNI, COL_NOMBRE_APELLIDO, COL_NUM_PERMISO, COL_VENCE, COL_LOCAL, COL_TAREA, COL_TIPO_PERMISO,
     COL_DNI_FAP_ORIGINAL, COL_NOMBRE_FAP_ORIGINAL, COL_APELLIDO_FAP_ORIGINAL, COL_NUM_PERMISO_FAP_ORIGINAL, COL_VENCE_FAP_ORIGINAL, COL_LOCAL_FAP_ORIGINAL,
@@ -12,6 +16,52 @@ from config import (
 # --- VARIABLES GLOBALES PARA DATAFRAMES Y TIEMPOS DE MODIFICACIÓN ---
 df_fap, df_fao, df_excepciones, df_nominas = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 ult_mod_fap, ult_mod_fao, ult_mod_excepciones, ult_mod_nominas = 0, 0, 0, 0
+
+def formatear_excel(nombre_archivo):
+    """
+    Aplica formato profesional a un archivo Excel: ajusta columnas,
+    formatea el encabezado y congela la primera fila.
+    """
+    try:
+        workbook = load_workbook(nombre_archivo)
+        worksheet = workbook.active
+
+        # Estilo para el encabezado
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+        header_alignment = Alignment(horizontal='center', vertical='center')
+
+        # Aplicar estilo al encabezado y ajustar ancho de columnas
+        for col in worksheet.columns:
+            max_length = 0
+            column = col[0].column_letter # Obtener la letra de la columna
+            
+            # Ajustar el ancho de la columna
+            for cell in col:
+                if cell.coordinate in worksheet.merged_cells: # Ignorar celdas combinadas
+                    continue
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = (max_length + 2)
+            worksheet.column_dimensions[column].width = adjusted_width
+
+            # Formatear la celda del encabezado
+            header_cell = worksheet[f"{column}1"]
+            header_cell.font = header_font
+            header_cell.fill = header_fill
+            header_cell.alignment = header_alignment
+
+        # Congelar la fila del encabezado
+        worksheet.freeze_panes = 'A2'
+        
+        workbook.save(nombre_archivo)
+        print(f"INFO: Formato aplicado correctamente a '{os.path.basename(nombre_archivo)}'.")
+
+    except Exception as e:
+        print(f"Error al aplicar formato a {os.path.basename(nombre_archivo)}: {e}")
 
 # --- FUNCIÓN AUXILIAR PARA LIMPIAR DNI/CUIL ---
 def extraer_dni_de_cuil(valor):
@@ -365,3 +415,171 @@ def recargar_cache_nominas_persistentes():
     ult_mod_fap, ult_mod_fao, ult_mod_excepciones, ult_mod_nominas = 0, 0, 0, 0
     
     cargar_autorizaciones()
+
+def procesar_nomina_texto(texto_nomina):
+    """
+    Procesa un string multilínea que contiene una nómina de personal
+    y la convierte en una lista de diccionarios.
+    La lógica de parseo es robusta para manejar diferentes espaciados y formatos.
+    """
+    print("--- INICIANDO PROCESAMIENTO DE NÓMINA ---")
+    lineas = texto_nomina.strip().splitlines() # Usar splitlines() para mejor manejo de saltos de línea
+    personas_final = []
+
+    # Expresiones regulares para varios formatos de línea.
+    # Se procesan en orden. La primera que coincida se usa.
+    formatos_regex = [
+        # Formato 1: "C.U.I.L. 20408951853 ABALOS AXEL SEBASTIAN" (y variantes)
+        (1, re.compile(r"^(?:C\.?U\.?I\.?L\.?[:\s]*)(?P<cuil>\d{11})\s+(?P<nombre_completo>.*)", re.IGNORECASE)),
+        
+        # Formato 2: "20-12345678-9 APELLIDO NOMBRE" (CUIL con guiones al inicio)
+        (2, re.compile(r"^(?P<cuil>\d{2}-\d{7,8}-\d{1})\s+(?P<nombre_completo>.*)", re.IGNORECASE)),
+
+        # Formato 3: "20365205044 11 FIGUEROA WALTER..." (CUIL, un número, y nombre)
+        (3, re.compile(r"^(?P<cuil>\d{11})\s+\d+\s+(?P<nombre_completo>.*)", re.IGNORECASE)),
+
+        # Formato 4: "20365205044 FIGUEROA WALTER..." (CUIL y nombre)
+        (4, re.compile(r"^(?P<cuil>\d{11})\s+(?P<nombre_completo>.*)", re.IGNORECASE)),
+
+        # Formato 5: DNI (7-8 digitos) y nombre
+        (5, re.compile(r"^(?P<dni>\d{7,8})\s+(?P<nombre_completo>.*)", re.IGNORECASE)),
+
+        # Formato 6: "APELLIDO NOMBRE 20-12345678-9" (CUIL con guiones al final)
+        (6, re.compile(r"^(?P<nombre_completo>.*?)\s+(?P<cuil>\d{2}-\d{7,8}-\d{1})$", re.IGNORECASE)),
+    ]
+
+    print(f"Texto recibido para procesar:\n---\n{texto_nomina}\n---")
+    print(f"Procesando {len(lineas)} líneas.")
+
+    for i, linea in enumerate(lineas):
+        linea = linea.strip()
+        print(f"\n[Línea {i+1}]: '{linea}'")
+        if not linea:
+            print("-> Línea vacía, ignorando.")
+            continue
+
+        # Ignorar encabezados comunes
+        if any(h in linea.upper() for h in ['CUIL', 'APELLIDO', 'NOMBRE', 'LEGAJO', 'LEGAJOS']):
+            print("-> Línea parece un encabezado, ignorando.")
+            continue
+
+        match = None
+        matched_format = 0
+        for fmt, regex in formatos_regex:
+            match = regex.match(linea)
+            if match:
+                matched_format = fmt
+                break
+        
+        if not match:
+            print(f"-> ADVERTENCIA: La línea no coincide con ningún formato conocido.")
+            continue
+
+        print(f"-> Coincide con formato #{matched_format}.")
+
+        try:
+            datos = match.groupdict()
+            print(f"   - Datos extraídos: {datos}")
+            dni = ""
+            apellido = ""
+            nombre = ""
+
+            if 'cuil' in datos:
+                dni = extraer_dni_de_cuil(datos['cuil'])
+                print(f"   - CUIL '{datos['cuil']}' -> DNI '{dni}'")
+            elif 'dni' in datos:
+                dni = datos['dni']
+                print(f"   - DNI encontrado: '{dni}'")
+
+            nombre_completo_str = datos.get('nombre_completo', '').strip()
+            
+            # Eliminar "Régimen General" si está al final
+            if nombre_completo_str.lower().endswith("régimen general"):
+                nombre_completo_str = nombre_completo_str[:-15].strip()
+
+            if not nombre_completo_str:
+                print(f"-> ADVERTENCIA: No se pudo extraer el nombre completo.")
+                continue
+
+            print(f"   - Nombre completo a procesar: '{nombre_completo_str}'")
+            partes_nombre = nombre_completo_str.split()
+            
+            # Lógica para separar Apellido y Nombre
+            if len(partes_nombre) >= 2:
+                # Asume que la primera palabra es el apellido y el resto es el nombre.
+                apellido = partes_nombre[0]
+                nombre = ' '.join(partes_nombre[1:])
+            elif len(partes_nombre) == 1:
+                # Si solo hay una palabra, se considera apellido.
+                apellido = partes_nombre[0]
+                nombre = ""
+            
+            print(f"   - Apellido: '{apellido}', Nombre: '{nombre}'")
+
+            if dni and (nombre or apellido):
+                persona = {'DNI': dni, 'Apellido': apellido, 'Nombre': nombre}
+                personas_final.append(persona)
+                print(f"-> ÉXITO: Persona agregada: {persona}")
+            else:
+                print(f"-> ADVERTENCIA: No se pudo extraer DNI o Nombre/Apellido válido.")
+
+        except (ValueError, IndexError) as e:
+            print(f"-> ERROR: La línea no pudo ser procesada, error: {e}.")
+            continue
+            
+    print(f"--- PROCESAMIENTO FINALIZADO: {len(personas_final)} personas encontradas. ---\n")
+    return personas_final
+
+def generar_reporte_consolidado():
+    """
+    Lee el registro diario, consolida las entradas y salidas en una sola fila por DNI,
+    y devuelve la ruta a un archivo Excel temporal con el reporte.
+    """
+    fecha_actual_str = datetime.now().strftime('%Y-%m-%d')
+    nombre_archivo_original = os.path.join(REGISTROS_DIARIOS_DIR, f'registros_ingreso_{fecha_actual_str}.xlsx')
+
+    if not os.path.exists(nombre_archivo_original):
+        return None, None
+
+    df = pd.read_excel(nombre_archivo_original)
+    
+    df['DNI'] = df['DNI'].astype(str)
+    df['Hora_Ingreso'] = df['Hora_Ingreso'].astype(str).replace(['NaT', 'nan'], '')
+    df['Hora_Salida'] = df['Hora_Salida'].astype(str).replace(['NaT', 'nan'], '')
+
+    consolidado_df = df.groupby('DNI').agg({
+        'Nombre y Apellido': 'first',
+        'Hora_Ingreso': 'first',
+        'Hora_Salida': 'last',
+        'Evento': 'first',
+        'Tipo_Permiso': 'first',
+        'Num_Permiso': 'first',
+        'Local': 'first',
+        'Tarea': 'first',
+        'Resultado': 'first' 
+    }).reset_index()
+
+    def calcular_resultado_final(row):
+        if row['Resultado'] == 'DENEGADO':
+            return 'DENEGADO'
+        if row['Hora_Salida'] and row['Hora_Salida'] != '':
+            return 'Registrado'
+        if row['Hora_Ingreso'] and row['Hora_Ingreso'] != '':
+            return 'Autorizado'
+        return row['Resultado']
+
+    consolidado_df['Resultado'] = consolidado_df.apply(calcular_resultado_final, axis=1)
+    
+    columnas_finales = ['DNI', 'Nombre y Apellido', 'Hora_Ingreso', 'Hora_Salida', 'Evento', 'Tipo_Permiso', 'Num_Permiso', 'Local', 'Tarea', 'Resultado']
+    consolidado_df = consolidado_df.reindex(columns=columnas_finales)
+
+    temp_dir = os.path.join(BASE_DIR, 'temp')
+    os.makedirs(temp_dir, exist_ok=True)
+    nombre_archivo_temp = os.path.join(temp_dir, f'reporte_consolidado_{fecha_actual_str}.xlsx')
+    
+    consolidado_df.to_excel(nombre_archivo_temp, index=False)
+    
+    formatear_excel(nombre_archivo_temp)
+
+    return nombre_archivo_temp, os.path.basename(nombre_archivo_temp)            
+    

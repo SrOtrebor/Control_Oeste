@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 import pandas as pd
-from flask import (Flask, jsonify, request, render_template, redirect, url_for, session, send_from_directory)
+from flask import (Flask, jsonify, request, render_template, redirect, url_for, session, send_from_directory, after_this_request)
 from werkzeug.utils import secure_filename
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -34,7 +34,9 @@ from data_manager import (
     delete_nomina_by_criteria,
     get_nomina_detalle_by_criteria,
     get_df_nominas_persistentes,
-    recargar_cache_nominas_persistentes
+    recargar_cache_nominas_persistentes,
+    procesar_nomina_texto,
+    generar_reporte_consolidado
 )
 
 from access_manager import (
@@ -293,7 +295,7 @@ def agregar_excepcion():
     data = request.get_json()
     
     # --- Columnas ESTÁNDAR que SIEMPRE usaremos ---
-    columnas_excepcion = ['Numero', 'Nombre Completo', 'Local', 'Quien Autoriza', 'Fecha de Alta']
+    columnas_excepcion = ['Numero', 'Nombre Completo', 'Local', 'Quien Autoriza', 'Fecha de Alta', 'Vigencia']
     
     df_actual = pd.DataFrame(columns=columnas_excepcion)
     
@@ -302,6 +304,10 @@ def agregar_excepcion():
         if os.path.exists(EXCEL_EXCEPCIONES):
             df_leido = pd.read_excel(EXCEL_EXCEPCIONES)
             # 2. Nos aseguramos de que solo tenga las columnas que nos importan
+            # Si faltan columnas nuevas, se añadirán con valores vacíos (NaN)
+            for col in columnas_excepcion:
+                if col not in df_leido.columns:
+                    df_leido[col] = pd.NA
             df_actual = df_leido[columnas_excepcion].copy()
             
     except Exception as e:
@@ -317,7 +323,15 @@ def agregar_excepcion():
     nombre_nuevo = f"{data['nombre']} {data['apellido']}"
     local_nuevo = data['local']
     autoriza_nuevo = data['autoriza']
-    fecha_nueva = datetime.now().strftime('%Y-%m-%d')
+    vigencia_nueva = data.get('vigencia') # Capturamos la vigencia
+    fecha_alta_nueva = datetime.now().strftime('%Y-%m-%d')
+
+    # Convertir la vigencia a datetime para asegurar el formato correcto en Excel
+    if vigencia_nueva:
+        vigencia_dt = pd.to_datetime(vigencia_nueva, errors='coerce')
+    else:
+        vigencia_dt = pd.NaT
+
 
     idx = df_actual[df_actual['Numero'] == dni_nuevo].index
 
@@ -327,7 +341,8 @@ def agregar_excepcion():
         df_actual.loc[idx[0], 'Nombre Completo'] = nombre_nuevo
         df_actual.loc[idx[0], 'Local'] = local_nuevo
         df_actual.loc[idx[0], 'Quien Autoriza'] = autoriza_nuevo
-        df_actual.loc[idx[0], 'Fecha de Alta'] = fecha_nueva
+        df_actual.loc[idx[0], 'Fecha de Alta'] = fecha_alta_nueva
+        df_actual.loc[idx[0], 'Vigencia'] = vigencia_dt
         mensaje_exito = 'Excepción actualizada.'
     else:
         # NO EXISTE: Agregamos una nueva fila
@@ -337,13 +352,14 @@ def agregar_excepcion():
             'Nombre Completo': nombre_nuevo,
             'Local': local_nuevo,
             'Quien Autoriza': autoriza_nuevo,
-            'Fecha de Alta': fecha_nueva
+            'Fecha de Alta': fecha_alta_nueva,
+            'Vigencia': vigencia_dt
         }], columns=columnas_excepcion)
         df_actual = pd.concat([df_actual, nuevo_registro], ignore_index=True)
         mensaje_exito = 'Excepción agregada.'
     
     try:
-        # 4. Guardamos SIEMPRE un DataFrame limpio con las 5 columnas correctas
+        # 4. Guardamos SIEMPRE un DataFrame limpio con las columnas correctas
         df_actual.to_excel(EXCEL_EXCEPCIONES, index=False, columns=columnas_excepcion)
         
         # 5. Forzamos la recarga
@@ -355,150 +371,29 @@ def agregar_excepcion():
         return jsonify({'success': False, 'message': f'Error al guardar: {e}'})
 
 @app.route('/parse_nomina', methods=['POST'])
-
 def parse_nomina():
+    if 'logged_in' not in session:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 403
 
     data = request.get_json()
-
     texto_pegado = data.get('texto_pegado', '')
 
-    personas = []
+    if not texto_pegado:
+        return jsonify({'success': False, 'message': 'El texto de la nómina no puede estar vacío.'})
 
+    # Usamos la función centralizada de data_manager
+    personas_procesadas = procesar_nomina_texto(texto_pegado)
 
-
-    # Regex para los tres formatos
-
-    # Formato 1: 20-34049323-1 APELLIDO NOMBRE TAREA
-
-    regex1 = re.compile(r'^(\d{2}-\d{8}-\d{1})\s+(.+?)\s+([\w\s]+)')
-
-    # Formato 2: 20446113047 1 APELLIDO NOMBRE TAREA
-
-    regex2 = re.compile(r'^(\d{11})\s+\d+\s+(.+?)\s+([\w\s]+)')
-
-    # Formato 3: APELLIDO NOMBRE 20-42090721-5
-
-    regex3 = re.compile(r'^(.+?)\s+(\d{2}-\d{8}-\d{1})')
-
-
-
-    def separar_nombre_apellido(nombre_completo):
-
-        partes = nombre_completo.strip().split()
-
-        if len(partes) >= 4: # "APELLIDO1 APELLIDO2 NOMBRE1 NOMBRE2"
-
-            apellido = " ".join(partes[:2])
-
-            nombre = " ".join(partes[2:])
-
-        elif len(partes) == 3: # "APELLIDO1 APELLIDO2 NOMBRE" o "APELLIDO NOMBRE1 NOMBRE2"
-
-            apellido = " ".join(partes[:2])
-
-            nombre = partes[2]
-
-        elif len(partes) == 2: # "APELLIDO NOMBRE"
-
-            apellido = partes[0]
-
-            nombre = partes[1]
-
-        else: # Un solo nombre/apellido
-
-            apellido = nombre_completo
-
-            nombre = ""
-
-        return apellido, nombre
-
-
-
-    for linea in texto_pegado.strip().splitlines():
-
-        linea = linea.strip()
-
-        if not linea:
-
-            continue
-
-
-
-        dni, apellido, nombre = None, None, None
-
-
-
-        # Probar Formato 3 (CUIL al final)
-
-        match3 = regex3.match(linea)
-
-        if match3:
-
-            nombre_completo = match3.group(1)
-
-            cuil = match3.group(2)
-
-            dni = extraer_dni_de_cuil(cuil)
-
-            apellido, nombre = separar_nombre_apellido(nombre_completo)
-
-            personas.append({'dni': dni, 'apellido': apellido, 'nombre': nombre})
-
-            continue
-
-
-
-        # Probar Formato 1 (CUIL con guion al inicio)
-
-        match1 = regex1.match(linea)
-
-        if match1:
-
-            cuil = match1.group(1)
-
-            # Se asume que el último elemento es la tarea y se descarta
-
-            nombre_completo = " ".join(match1.group(2).split()[:-1])
-
-            dni = extraer_dni_de_cuil(cuil)
-
-            apellido, nombre = separar_nombre_apellido(nombre_completo)
-
-            personas.append({'dni': dni, 'apellido': apellido, 'nombre': nombre})
-
-            continue
-
-
-
-        # Probar Formato 2 (CUIL sin guion al inicio)
-
-        match2 = regex2.match(linea)
-
-        if match2:
-
-            cuil = match2.group(1)
-
-            # Se asume que el último elemento es la tarea y se descarta
-
-            nombre_completo = " ".join(match2.group(2).split()[:-1])
-
-            dni = extraer_dni_de_cuil(cuil)
-
-            apellido, nombre = separar_nombre_apellido(nombre_completo)
-
-            personas.append({'dni': dni, 'apellido': apellido, 'nombre': nombre})
-
-            continue
-
-            
-
-    if not personas:
-
+    if not personas_procesadas:
         return jsonify({'success': False, 'message': 'No se pudo interpretar ninguna persona. Revise el formato del texto.'})
 
+    # Adaptamos el formato de salida para el frontend (claves en minúscula)
+    nomina_para_frontend = [
+        {'dni': p['DNI'], 'apellido': p['Apellido'], 'nombre': p['Nombre']}
+        for p in personas_procesadas
+    ]
 
-
-    return jsonify({'success': True, 'nomina': personas})
+    return jsonify({'success': True, 'nomina': nomina_para_frontend})
 
 
 
@@ -874,22 +769,28 @@ def send_report_email():
 
 
 @app.route('/descargar_reporte_diario')
-
 def descargar_reporte_diario():
-
     if 'logged_in' not in session:
-
         return redirect(url_for('login_page'))
 
-    fecha_hoy = datetime.now().strftime('%Y-%m-%d')
+    # Llama a la nueva función para generar el reporte consolidado
+    temp_path, filename = generar_reporte_consolidado()
 
-    archivo_accesos = os.path.join(REGISTROS_DIARIOS_DIR, f'registros_ingreso_{fecha_hoy}.xlsx')
-
-    if not os.path.exists(archivo_accesos):
-
+    if not temp_path:
         return "No hay reporte de accesos para hoy.", 404
 
-    return send_from_directory(directory=REGISTROS_DIARIOS_DIR, path=f'registros_ingreso_{fecha_hoy}.xlsx', as_attachment=True)
+    temp_dir = os.path.dirname(temp_path)
+
+    @after_this_request
+    def cleanup(response):
+        try:
+            os.remove(temp_path)
+            print(f"INFO: Archivo temporal '{filename}' eliminado.")
+        except Exception as e:
+            print(f"Error al eliminar archivo temporal: {e}")
+        return response
+
+    return send_from_directory(directory=temp_dir, path=filename, as_attachment=True)
 
 
 

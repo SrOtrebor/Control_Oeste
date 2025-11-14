@@ -42,11 +42,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 data.records.reverse(); // Muestra los más recientes primero
                 data.records.forEach(record => {
                     const row = targetTableBody.insertRow();
-                    if (record.Resultado === 'VERDE') row.classList.add('fila-verde');
-                    else if (record.Resultado === 'ROJO') row.classList.add('fila-roja');
+                    if (record.Resultado === 'AUTORIZADO') row.classList.add('fila-verde');
+                    else if (record.Resultado === 'DENEGADO') row.classList.add('fila-roja');
                     if (record.Tipo_Permiso === 'FAO') row.classList.add('fila-fao');
 
-                    row.insertCell().textContent = record.Hora_Ingreso ? record.Hora_Ingreso.split(' ')[1] || record.Hora_Ingreso : '';
+                    const timeString = record.Hora_Ingreso || record.Hora_Salida || '';
+                    row.insertCell().textContent = timeString.split(' ')[1] || timeString;
                     row.insertCell().textContent = record.DNI || '';
                     row.insertCell().textContent = record['Nombre y Apellido'] || '';
                     row.insertCell().textContent = record.Evento || '';
@@ -206,8 +207,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const data = await response.json();
                 
+                let color = 'roja';
+                if (data.acceso === 'PERMITIDO') {
+                    // Si el modo es 'salida', usamos un color neutro, si no, verde.
+                    color = (currentMode === 'salida') ? 'gris' : 'verde';
+                }
+
                 const vencimientoTexto = data.vence && data.vence !== 'N/A' ? (data.acceso === 'PERMITIDO' ? `Vence: ${data.vence}`: `Vencido el: ${data.vence}`) : '';
-                mostrarResultado(data.acceso === 'PERMITIDO' ? 'verde' : 'roja', data.mensaje, data.nombre, data.local, data.tarea, vencimientoTexto);
+                mostrarResultado(color, data.mensaje, data.nombre, data.local, data.tarea, vencimientoTexto);
 
             } catch (error) {
                 console.error('Error al verificar DNI:', error);
@@ -351,6 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const dni = document.getElementById('dniExcepcion').value;
             const local = document.getElementById('localExcepcion').value;
             const autoriza = document.getElementById('autorizaExcepcion').value;
+            const vigencia = document.getElementById('vigenciaExcepcion').value; // Capturar vigencia
             const excepcionStatus = document.getElementById('excepcionStatus');
 
             if (nombre && apellido && dni && local && autoriza) {
@@ -358,7 +366,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const response = await fetch('/agregar_excepcion', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ nombre, apellido, dni, local, autoriza })
+                        body: JSON.stringify({ nombre, apellido, dni, local, autoriza, vigencia }) // Enviar vigencia
                     });
                     const data = await response.json();
                     excepcionStatus.textContent = data.message;
@@ -369,6 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         document.getElementById('dniExcepcion').value = '';
                         document.getElementById('localExcepcion').value = '';
                         document.getElementById('autorizaExcepcion').value = '';
+                        document.getElementById('vigenciaExcepcion').value = ''; // Limpiar campo de vigencia
                     }
                 } catch (error) {
                     console.error('Error al agregar excepción:', error);
