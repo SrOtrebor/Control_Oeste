@@ -154,6 +154,25 @@
                         <tbody id="adminIngresosListBody"></tbody>
                     </table>
                 </div>
+            
+            <!-- Selector de Fechas para Reportes -->
+            <div class="admin-section" style="margin-top: 1rem;">
+                <h3><span class="material-icons">date_range</span>Seleccionar Período de Reportes</h3>
+                <div class="form-row">
+                    <div class="input-group">
+                        <label for="fechaDesdeReporte">Desde</label>
+                        <input type="date" id="fechaDesdeReporte">
+                    </div>
+                    <div class="input-group">
+                        <label for="fechaHastaReporte">Hasta</label>
+                        <input type="date" id="fechaHastaReporte">
+                    </div>
+                </div>
+                <p class="status-message" style="font-size: 0.9rem; color: #666;">
+                    💡 Deja ambas fechas vacías para descargar el reporte de hoy
+                </p>
+            </div>
+            
             <button id="enviarReporteBtn" class="report-button">Enviar Reporte por Email</button>
             <button id="descargarReporteBtn" class="report-button">Descargar Reporte de Accesos</button>
             <button id="descargarFichajesBtn" class="report-button">Descargar Reporte de Fichajes</button>

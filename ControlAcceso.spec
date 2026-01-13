@@ -11,7 +11,11 @@ a = Analysis(['app.py'],
              # AQUÍ AGREGAMOS NUESTRAS CARPETAS Y ARCHIVOS
              datas=[
                  ('templates', 'templates'),
-                 ('static', 'static')
+                 ('static', 'static'),
+                 ('ListadoFAPs.xlsx', '.'),
+                 ('ListadoFAOs.xlsx', '.'),
+                 ('excepciones.xlsx', '.'),
+                 ('nominas_persistentes.xlsx', '.')
              ],
              # AQUÍ AGREGAMOS LIBRERÍAS OCULTAS QUE PANDAS USA
              hiddenimports=['pandas._libs.tslibs.base', 'openpyxl'],

@@ -12,6 +12,10 @@ from config import (
     COL_DNI_FAP_ORIGINAL, COL_NOMBRE_FAP_ORIGINAL, COL_APELLIDO_FAP_ORIGINAL, COL_NUM_PERMISO_FAP_ORIGINAL, COL_VENCE_FAP_ORIGINAL, COL_LOCAL_FAP_ORIGINAL,
     COL_DNI_FAO_ORIGINAL, COL_NOMBRE_FAO_ORIGINAL, COL_APELLIDO_FAO_ORIGINAL, COL_NUM_PERMISO_FAO_ORIGINAL, COL_VENCE_FAO_ORIGINAL, COL_LOCAL_FAO_ORIGINAL, COL_TAREA_FAO_ORIGINAL
 )
+from logger_config import get_logger
+
+# Logger para este módulo
+logger = get_logger(__name__)
 
 # --- VARIABLES GLOBALES PARA DATAFRAMES Y TIEMPOS DE MODIFICACIÓN ---
 df_fap, df_fao, df_excepciones, df_nominas = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
@@ -58,10 +62,10 @@ def formatear_excel(nombre_archivo):
         worksheet.freeze_panes = 'A2'
         
         workbook.save(nombre_archivo)
-        print(f"INFO: Formato aplicado correctamente a '{os.path.basename(nombre_archivo)}'.")
+        logger.info(f"Formato aplicado correctamente a '{os.path.basename(nombre_archivo)}'.")
 
     except Exception as e:
-        print(f"Error al aplicar formato a {os.path.basename(nombre_archivo)}: {e}")
+        logger.error(f"Error al aplicar formato a {os.path.basename(nombre_archivo)}: {e}")
 
 # --- FUNCIÓN AUXILIAR PARA LIMPIAR DNI/CUIL ---
 def extraer_dni_de_cuil(valor):
@@ -90,7 +94,7 @@ def cargar_y_procesar_excel(archivo_excel, ultima_modificacion, tipo_permiso, ma
         if mod_time == ultima_modificacion and not df_actual.empty:
             return df_actual, ultima_modificacion
 
-        print(f"INFO: Detectado cambio en '{os.path.basename(archivo_excel)}'. Recargando...")
+        logger.info(f"Detectado cambio en '{os.path.basename(archivo_excel)}'. Recargando...")
         
         dtype_map = {}
         if dni_col_original is not None:
@@ -112,14 +116,14 @@ def cargar_y_procesar_excel(archivo_excel, ultima_modificacion, tipo_permiso, ma
 
         df[COL_TIPO_PERMISO] = tipo_permiso
         
-        print(f"-> Recargado y procesado: {os.path.basename(archivo_excel)}")
+        logger.debug(f"Recargado y procesado: {os.path.basename(archivo_excel)}")
         return df, mod_time
 
     except FileNotFoundError:
-        print(f"ADVERTENCIA: No se encontró el archivo {archivo_excel}. Se continuará sin él.")
+        logger.warning(f"No se encontró el archivo {archivo_excel}. Se continuará sin él.")
         return pd.DataFrame(), 0
     except Exception as e:
-        print(f"Error Crítico al procesar {archivo_excel}: {e}")
+        logger.error(f"Error crítico al procesar {archivo_excel}: {e}", exc_info=True)
         return df_actual, ultima_modificacion
 
 def cargar_autorizaciones():
@@ -182,7 +186,7 @@ def get_nominas_agrupadas():
         return nominas_list
         
     except Exception as e:
-        print(f"Error al agrupar nóminas: {e}")
+        logger.error(f"Error al agrupar nóminas: {e}")
         return []  
 def delete_nomina_by_criteria(empresa, vigencia):
     """
@@ -192,7 +196,7 @@ def delete_nomina_by_criteria(empresa, vigencia):
     try:
         df = df_nominas.copy()
         if df.empty:
-            print("INFO: El DataFrame de nóminas en memoria está vacío. No hay nada que borrar.")
+            logger.info("El DataFrame de nóminas en memoria está vacío. No hay nada que borrar.")
             return True
 
         # --- Lógica para comparar rangos de vigencia ---
@@ -230,14 +234,14 @@ def delete_nomina_by_criteria(empresa, vigencia):
         # Guardar el DataFrame filtrado de vuelta al archivo
         df_a_guardar.to_excel(EXCEL_NOMINAS, index=False)
         
-        print(f"INFO: Nómina para '{empresa}' con vigencia {vigencia} eliminada.")
+        logger.info(f"Nómina para '{empresa}' con vigencia {vigencia} eliminada.")
         
         # Forzar la recarga de datos en la memoria
         recargar_cache_nominas_persistentes()
         return True
         
     except Exception as e:
-        print(f"Error Crítico al eliminar la nómina: {e}")
+        logger.error(f"Error crítico al eliminar la nómina: {e}", exc_info=True)
         return False
 
 def update_nomina_entry(old_dni, old_empresa, old_vigencia_desde, old_vigencia_hasta,
@@ -249,12 +253,12 @@ def update_nomina_entry(old_dni, old_empresa, old_vigencia_desde, old_vigencia_h
     """
     try:
         if not os.path.exists(EXCEL_NOMINAS):
-            print("ADVERTENCIA: No existe archivo de nóminas para modificar.")
+            logger.warning("No existe archivo de nóminas para modificar.")
             return False
 
         df = pd.read_excel(EXCEL_NOMINAS)
         if df.empty:
-            print("ADVERTENCIA: El archivo de nóminas está vacío, no hay nada que modificar.")
+            logger.warning("El archivo de nóminas está vacío, no hay nada que modificar.")
             return False
 
         # Asegurarse de que las columnas de fecha sean datetime para la comparación
@@ -278,7 +282,7 @@ def update_nomina_entry(old_dni, old_empresa, old_vigencia_desde, old_vigencia_h
         indices_a_modificar = df[condicion].index
 
         if indices_a_modificar.empty:
-            print(f"ADVERTENCIA: No se encontró la entrada de nómina para modificar con DNI: {old_dni}, Empresa: {old_empresa}, Vigencia Desde: {old_vigencia_desde}, Vigencia Hasta: {old_vigencia_hasta}")
+            logger.warning(f"No se encontró la entrada de nómina para modificar con DNI: {old_dni}, Empresa: {old_empresa}, Vigencia Desde: {old_vigencia_desde}, Vigencia Hasta: {old_vigencia_hasta}")
             return False
 
         # Aplicar las modificaciones
@@ -293,14 +297,14 @@ def update_nomina_entry(old_dni, old_empresa, old_vigencia_desde, old_vigencia_h
         # Guardar el DataFrame modificado de vuelta al archivo
         df.to_excel(EXCEL_NOMINAS, index=False)
 
-        print(f"INFO: Entrada de nómina modificada exitosamente para DNI: {old_dni}.")
+        logger.info(f"Entrada de nómina modificada exitosamente para DNI: {old_dni}.")
         
         # Forzar la recarga de datos en la memoria
         cargar_autorizaciones()
         return True
 
     except Exception as e:
-        print(f"Error Crítico al modificar la entrada de nómina: {e}")
+        logger.error(f"Error crítico al modificar la entrada de nómina: {e}", exc_info=True)
         return False
 
 
@@ -353,7 +357,7 @@ def get_nomina_detalle_by_criteria(empresa, vigencia, filtro_dni=None, filtro_no
         }
         
     except Exception as e:
-        print(f"Error al obtener detalle de nómina: {e}")
+        logger.error(f"Error al obtener detalle de nómina: {e}")
         return None
 
 def get_single_nomina_entry(dni, empresa, vigencia_desde, vigencia_hasta):
@@ -395,7 +399,7 @@ def get_single_nomina_entry(dni, empresa, vigencia_desde, vigencia_hasta):
         return entry_dict
 
     except Exception as e:
-        print(f"Error al obtener entrada de nómina individual: {e}")
+        logger.error(f"Error al obtener entrada de nómina individual: {e}")
         return None
     
 def get_df_nominas_persistentes():
@@ -409,7 +413,7 @@ def recargar_cache_nominas_persistentes():
     """
     Alias para forzar la recarga de todos los DataFrames, incluidas las nóminas.
     """
-    print("INFO: Forzando recarga de todos los cachés de autorización...")
+    logger.info("Forzando recarga de todos los cachés de autorización...")
     # Reseteamos los tiempos de modificación para forzar la recarga
     global ult_mod_fap, ult_mod_fao, ult_mod_excepciones, ult_mod_nominas
     ult_mod_fap, ult_mod_fao, ult_mod_excepciones, ult_mod_nominas = 0, 0, 0, 0
@@ -422,7 +426,7 @@ def procesar_nomina_texto(texto_nomina):
     y la convierte en una lista de diccionarios.
     La lógica de parseo es robusta para manejar diferentes espaciados y formatos.
     """
-    print("--- INICIANDO PROCESAMIENTO DE NÓMINA ---")
+    logger.debug("INICIANDO PROCESAMIENTO DE NÓMINA ---")
     lineas = texto_nomina.strip().splitlines() # Usar splitlines() para mejor manejo de saltos de línea
     personas_final = []
 
@@ -448,19 +452,19 @@ def procesar_nomina_texto(texto_nomina):
         (6, re.compile(r"^(?P<nombre_completo>.*?)\s+(?P<cuil>\d{2}-\d{7,8}-\d{1})$", re.IGNORECASE)),
     ]
 
-    print(f"Texto recibido para procesar:\n---\n{texto_nomina}\n---")
-    print(f"Procesando {len(lineas)} líneas.")
+    logger.debug(f"Texto recibido para procesar:\n---\n{texto_nomina}\n---")
+    logger.debug(f"Procesando {len(lineas)} líneas.")
 
     for i, linea in enumerate(lineas):
         linea = linea.strip()
         print(f"\n[Línea {i+1}]: '{linea}'")
         if not linea:
-            print("-> Línea vacía, ignorando.")
+            logger.debug("Línea vacía, ignorando.")
             continue
 
         # Ignorar encabezados comunes
         if any(h in linea.upper() for h in ['CUIL', 'APELLIDO', 'NOMBRE', 'LEGAJO', 'LEGAJOS']):
-            print("-> Línea parece un encabezado, ignorando.")
+            logger.debug("Línea parece un encabezado, ignorando.")
             continue
 
         match = None
@@ -472,24 +476,24 @@ def procesar_nomina_texto(texto_nomina):
                 break
         
         if not match:
-            print(f"-> ADVERTENCIA: La línea no coincide con ningún formato conocido.")
+            logger.debug(f"ADVERTENCIA: La línea no coincide con ningún formato conocido.")
             continue
 
-        print(f"-> Coincide con formato #{matched_format}.")
+        logger.debug(f"Coincide con formato #{matched_format}.")
 
         try:
             datos = match.groupdict()
-            print(f"   - Datos extraídos: {datos}")
+            logger.debug(f"Datos extraídos: {datos}")
             dni = ""
             apellido = ""
             nombre = ""
 
             if 'cuil' in datos:
                 dni = extraer_dni_de_cuil(datos['cuil'])
-                print(f"   - CUIL '{datos['cuil']}' -> DNI '{dni}'")
+                logger.debug(f"CUIL '{datos['cuil']}' -> DNI '{dni}'")
             elif 'dni' in datos:
                 dni = datos['dni']
-                print(f"   - DNI encontrado: '{dni}'")
+                logger.debug(f"DNI encontrado: '{dni}'")
 
             nombre_completo_str = datos.get('nombre_completo', '').strip()
             
@@ -498,10 +502,10 @@ def procesar_nomina_texto(texto_nomina):
                 nombre_completo_str = nombre_completo_str[:-15].strip()
 
             if not nombre_completo_str:
-                print(f"-> ADVERTENCIA: No se pudo extraer el nombre completo.")
+                logger.debug(f"ADVERTENCIA: No se pudo extraer el nombre completo.")
                 continue
 
-            print(f"   - Nombre completo a procesar: '{nombre_completo_str}'")
+            logger.debug(f"Nombre completo a procesar: '{nombre_completo_str}'")
             partes_nombre = nombre_completo_str.split()
             
             # Lógica para separar Apellido y Nombre
@@ -514,20 +518,20 @@ def procesar_nomina_texto(texto_nomina):
                 apellido = partes_nombre[0]
                 nombre = ""
             
-            print(f"   - Apellido: '{apellido}', Nombre: '{nombre}'")
+            logger.debug(f"Apellido: '{apellido}', Nombre: '{nombre}'")
 
             if dni and (nombre or apellido):
                 persona = {'DNI': dni, 'Apellido': apellido, 'Nombre': nombre}
                 personas_final.append(persona)
-                print(f"-> ÉXITO: Persona agregada: {persona}")
+                logger.debug(f"ÉXITO: Persona agregada: {persona}")
             else:
-                print(f"-> ADVERTENCIA: No se pudo extraer DNI o Nombre/Apellido válido.")
+                logger.debug(f"ADVERTENCIA: No se pudo extraer DNI o Nombre/Apellido válido.")
 
         except (ValueError, IndexError) as e:
-            print(f"-> ERROR: La línea no pudo ser procesada, error: {e}.")
+            logger.debug(f"ERROR: La línea no pudo ser procesada, error: {e}.")
             continue
             
-    print(f"--- PROCESAMIENTO FINALIZADO: {len(personas_final)} personas encontradas. ---\n")
+    logger.debug(f"PROCESAMIENTO FINALIZADO: {len(personas_final)} personas encontradas. ---\n")
     return personas_final
 
 def generar_reporte_consolidado():

@@ -1,2 +1,7 @@
 pandas
 openpyxl
+pyinstaller
+Flask
+pywebview
+python-dotenv
+pytest

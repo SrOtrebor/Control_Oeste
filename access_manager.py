@@ -7,12 +7,16 @@ from config import (
     REGISTROS_DIARIOS_DIR, REGISTROS_FICHAJES_DIR,
     COL_DNI, COL_NOMBRE_APELLIDO, COL_NUM_PERMISO, COL_VENCE, COL_LOCAL, COL_TAREA, COL_TIPO_PERMISO
 )
+from logger_config import get_logger, log_access_event
 
 # --- INICIO DE LA CORRECCIÓN ---
 # Importamos el MÓDULO 'data_manager' en lugar de las variables
 import data_manager
 from data_manager import formatear_excel
 # --- FIN DE LA CORRECCIÓN ---
+
+# Logger para este módulo
+logger = get_logger(__name__)
 
 
 # Conjunto para llevar registro de personas actualmente dentro
@@ -107,7 +111,7 @@ def registrar_evento(dni, nombre, hora_evento, evento, tipo_permiso, num_permiso
         formatear_excel(nombre_archivo)
 
     except Exception as e:
-        print(f"Error Crítico al guardar registro en Excel: {e}")
+        logger.error(f"Error crítico al guardar registro en Excel: {e}", exc_info=True)
 
 def registrar_evento_fichaje(dni, nombre, fecha, hora_entrada, hora_salida):
     # (Tu función de fichaje original, no se cambia)
@@ -115,8 +119,13 @@ def registrar_evento_fichaje(dni, nombre, fecha, hora_entrada, hora_salida):
     columnas = ['DNI', 'Nombre y Apellido', 'Fecha', 'Hora_Entrada', 'Hora_Salida']
     try:
         if os.path.exists(nombre_archivo):
-            df_fichajes = pd.read_excel(nombre_archivo)
-            df_fichajes['DNI'] = df_fichajes['DNI'].astype(str)
+            # Especificar dtype para columnas problemáticas y rellenar NaNs
+            df_fichajes = pd.read_excel(nombre_archivo, dtype={
+                'DNI': str,
+                'Hora_Entrada': str,
+                'Hora_Salida': str
+            })
+            df_fichajes.fillna('', inplace=True)
         else:
             df_fichajes = pd.DataFrame(columns=columnas)
         idx = df_fichajes[(df_fichajes['DNI'] == dni) & (df_fichajes['Fecha'] == fecha)].index
@@ -129,15 +138,15 @@ def registrar_evento_fichaje(dni, nombre, fecha, hora_entrada, hora_salida):
         formatear_excel(nombre_archivo)
         return True
     except Exception as e:
-        print(f"Error Crítico al guardar registro de fichaje: {e}")
+        logger.error(f"Error crítico al guardar registro de fichaje: {e}", exc_info=True)
         return False
 
 def verificar_dni(scanner_data, mode):
-    print("\n--- INICIANDO NUEVA VERIFICACIÓN (CON DEPURACIÓN EXTENDIDA) ---")
+    logger.debug("Iniciando nueva verificación de DNI")
     parsed_data = parsear_codigo_barra(scanner_data)
     
     if not parsed_data or 'dni' not in parsed_data:
-        print("DEBUG: DNI no pudo ser parseado del scanner_data.")
+        logger.warning(f"DNI no pudo ser parseado del scanner_data: {scanner_data[:50]}")
         return {'acceso': 'DENEGADO', 'mensaje': 'Formato de DNI no válido o DNI no encontrado.'}
 
     dni_ingresado_str = parsed_data.get('dni')
@@ -146,7 +155,7 @@ def verificar_dni(scanner_data, mode):
     hoy = datetime.now()
     hora_actual_str = hoy.strftime('%H:%M:%S')
     dni_limpio_str = re.sub(r'[\.\s-]', '', str(dni_ingresado_str)).strip()
-    print(f"DEBUG: DNI parseado y limpiado para búsqueda: '{dni_limpio_str}' (Tipo: {type(dni_limpio_str)})")
+    logger.debug(f"DNI parseado y limpiado: '{dni_limpio_str}'")
 
     # --- LÓGICA DE SALIDA / VISITA (sin cambios) ---
     if mode == 'salida':
@@ -171,16 +180,16 @@ def verificar_dni(scanner_data, mode):
 
     # --- LÓGICA DE ENTRADA (CORREGIDA) ---
     if mode == 'entrada':
-        print("DEBUG: Modo 'entrada' seleccionado. Verificando todas las listas.")
+        logger.debug("Modo 'entrada' seleccionado. Verificando todas las listas")
         data_manager.cargar_autorizaciones() 
         
         # --- 1. Verificar en Nóminas Persistentes ---
-        print("\nDEBUG: 1. Verificando en Nóminas Persistentes...")
+        logger.debug("Verificando en Nóminas Persistentes")
         df_nominas_persistentes = data_manager.get_df_nominas_persistentes()
         if not df_nominas_persistentes.empty and COL_DNI in df_nominas_persistentes.columns:
             match = df_nominas_persistentes[df_nominas_persistentes[COL_DNI] == dni_limpio_str]
             if not match.empty:
-                print("   - DNI ENCONTRADO en Nóminas Persistentes.")
+                logger.debug(f"DNI {dni_limpio_str} encontrado en Nóminas Persistentes")
                 persona = match.iloc[0]
                 desde = persona.get('Vigencia Desde')
                 hasta = persona.get('Vigencia Hasta')
@@ -190,93 +199,104 @@ def verificar_dni(scanner_data, mode):
                 # 2. Si hay fechas, deben estar dentro del rango válido.
                 fechas_validas = pd.notna(desde) and pd.notna(hasta)
                 if not fechas_validas or (fechas_validas and pd.Timestamp(desde) <= hoy <= pd.Timestamp(hasta)):
-                    print("   - Permiso de Nómina Persistente VÁLIDO. ACCESO PERMITIDO.")
                     nombre = persona.get(COL_NOMBRE_APELLIDO, 'N/A')
                     local = persona.get(COL_LOCAL, 'N/A')
                     tarea = persona.get(COL_TAREA, 'N/A')
                     vence_str = pd.Timestamp(hasta).strftime('%d/%m/%Y') if fechas_validas else 'Indefinido'
                     
+                    logger.info(f"Acceso PERMITIDO - DNI: {dni_limpio_str}, Nombre: {nombre}, Tipo: Nómina Persistente")
+                    log_access_event(dni_limpio_str, nombre, 'PERMITIDO', 'Nomina Persistente', f'Local: {local}')
+                    
                     personas_adentro[dni_limpio_str] = 'Nomina Persistente'
                     registrar_evento(dni_limpio_str, nombre, hora_actual_str, 'Entrada OK', 'Nomina Persistente', 'N/A', local, tarea, 'AUTORIZADO')
                     return {'acceso': 'PERMITIDO', 'nombre': nombre, 'mensaje': f'ACCESO PERMITIDO (Nomina): {nombre}', 'tipo_permiso': 'Nomina Persistente', 'num_permiso': 'N/A', 'local': local, 'tarea': tarea, 'vence': vence_str}
                 else:
-                    # Este caso solo se da si las fechas existen pero están vencidas.
-                    print(f"   - Permiso encontrado en Nómina Persistente pero su vigencia ha expirado.")
+                    logger.debug(f"Permiso de Nómina Persistente vencido para DNI {dni_limpio_str}")
             else:
-                print("   - DNI no encontrado en Nóminas Persistentes.")
+                logger.debug(f"DNI {dni_limpio_str} no encontrado en Nóminas Persistentes")
 
         # --- 2. Verificar en lista FAP ---
-        print("\nDEBUG: 2. Verificando en FAP...")
+        logger.debug("Verificando en FAP")
         if not data_manager.df_fap.empty and COL_DNI in data_manager.df_fap.columns:
             match = data_manager.df_fap[data_manager.df_fap[COL_DNI] == dni_limpio_str]
             if not match.empty:
-                print("   - DNI ENCONTRADO en FAP.")
+                logger.debug(f"DNI {dni_limpio_str} encontrado en FAP")
                 persona = match.iloc[0]
                 vence_val = persona.get(COL_VENCE)
                 if pd.notna(vence_val) and hoy.date() <= pd.Timestamp(vence_val).date():
-                    print("   - Permiso FAP VÁLIDO. ACCESO PERMITIDO.")
                     nombre = persona.get(COL_NOMBRE_APELLIDO, 'N/A')
                     tipo_permiso = persona.get(COL_TIPO_PERMISO, 'FAP')
                     num_permiso = persona.get(COL_NUM_PERMISO, 'N/A')
                     local = persona.get(COL_LOCAL, 'N/A')
                     tarea = persona.get(COL_TAREA, 'N/A')
                     vence_str = pd.Timestamp(vence_val).strftime('%d/%m/%Y')
+                    
+                    logger.info(f"Acceso PERMITIDO - DNI: {dni_limpio_str}, Nombre: {nombre}, Tipo: FAP")
+                    log_access_event(dni_limpio_str, nombre, 'PERMITIDO', 'FAP', f'Local: {local}, Vence: {vence_str}')
+                    
                     personas_adentro[dni_limpio_str] = tipo_permiso
                     registrar_evento(dni_limpio_str, nombre, hora_actual_str, 'Entrada OK', tipo_permiso, num_permiso, local, tarea, 'AUTORIZADO')
                     return {'acceso': 'PERMITIDO', 'nombre': nombre, 'mensaje': f'ACCESO PERMITIDO (FAP): {nombre}', 'tipo_permiso': tipo_permiso, 'num_permiso': num_permiso, 'local': local, 'tarea': tarea, 'vence': vence_str}
                 else:
-                    print(f"   - Permiso encontrado en FAP pero está vencido.")
+                    logger.debug(f"Permiso FAP vencido para DNI {dni_limpio_str}")
             else:
-                print("   - DNI no encontrado en FAP.")
+                logger.debug(f"DNI {dni_limpio_str} no encontrado en FAP")
 
         # --- 3. Verificar en lista FAO ---
-        print("\nDEBUG: 3. Verificando en FAO...")
+        logger.debug("Verificando en FAO")
         if not data_manager.df_fao.empty and COL_DNI in data_manager.df_fao.columns:
             match = data_manager.df_fao[data_manager.df_fao[COL_DNI] == dni_limpio_str]
             if not match.empty:
-                print("   - DNI ENCONTRADO en FAO.")
+                logger.debug(f"DNI {dni_limpio_str} encontrado en FAO")
                 persona = match.iloc[0]
                 vence_val = persona.get(COL_VENCE)
                 if pd.notna(vence_val) and hoy.date() <= pd.Timestamp(vence_val).date():
-                    print("   - Permiso FAO VÁLIDO. ACCESO PERMITIDO.")
                     nombre = persona.get(COL_NOMBRE_APELLIDO, 'N/A')
                     tipo_permiso = persona.get(COL_TIPO_PERMISO, 'FAO')
                     num_permiso = persona.get(COL_NUM_PERMISO, 'N/A')
                     local = persona.get(COL_LOCAL, 'N/A')
                     tarea = persona.get(COL_TAREA, 'N/A')
                     vence_str = pd.Timestamp(vence_val).strftime('%d/%m/%Y')
+                    
+                    logger.info(f"Acceso PERMITIDO - DNI: {dni_limpio_str}, Nombre: {nombre}, Tipo: FAO")
+                    log_access_event(dni_limpio_str, nombre, 'PERMITIDO', 'FAO', f'Local: {local}, Vence: {vence_str}')
+                    
                     personas_adentro[dni_limpio_str] = tipo_permiso
                     registrar_evento(dni_limpio_str, nombre, hora_actual_str, 'Entrada OK', tipo_permiso, num_permiso, local, tarea, 'AUTORIZADO')
                     return {'acceso': 'PERMITIDO', 'nombre': nombre, 'mensaje': f'ACCESO PERMITIDO (FAO): {nombre}', 'tipo_permiso': tipo_permiso, 'num_permiso': num_permiso, 'local': local, 'tarea': tarea, 'vence': vence_str}
                 else:
-                    print(f"   - Permiso encontrado en FAO pero está vencido.")
+                    logger.debug(f"Permiso FAO vencido para DNI {dni_limpio_str}")
             else:
-                print("   - DNI no encontrado en FAO.")
+                logger.debug(f"DNI {dni_limpio_str} no encontrado en FAO")
 
         # --- 4. Verificar en lista de excepciones ---
-        print("\nDEBUG: 4. Verificando en Excepciones...")
+        logger.debug("Verificando en Excepciones")
         if not data_manager.df_excepciones.empty and COL_DNI in data_manager.df_excepciones.columns:
             match = data_manager.df_excepciones[data_manager.df_excepciones[COL_DNI] == dni_limpio_str]
             if not match.empty:
-                print("   - DNI ENCONTRADO en Excepciones.")
+                logger.debug(f"DNI {dni_limpio_str} encontrado en Excepciones")
                 excepcion = match.iloc[0]
                 vence_val = excepcion.get(COL_VENCE)
                 if pd.notna(vence_val) and hoy.date() <= pd.Timestamp(vence_val).date():
-                    print("   - Excepción VÁLIDA. ACCESO PERMITIDO.")
                     nombre = excepcion.get(COL_NOMBRE_APELLIDO, 'N/A')
                     local = excepcion.get(COL_LOCAL, 'N/A')
                     vence_str = pd.Timestamp(vence_val).strftime('%d/%m/%Y')
                     quien_autoriza = excepcion.get('Quien_Autoriza', 'N/A')
+                    
+                    logger.info(f"Acceso PERMITIDO - DNI: {dni_limpio_str}, Nombre: {nombre}, Tipo: Excepción")
+                    log_access_event(dni_limpio_str, nombre, 'PERMITIDO', 'Excepcion', f'Autoriza: {quien_autoriza}, Vence: {vence_str}')
+                    
                     personas_adentro[dni_limpio_str] = 'Excepcion'
                     registrar_evento(dni_limpio_str, nombre, hora_actual_str, 'Entrada OK', 'Excepcion', quien_autoriza, local, 'N/A', 'AUTORIZADO')
                     return {'acceso': 'PERMITIDO', 'nombre': nombre, 'mensaje': f'ACCESO PERMITIDO (Excepción): {nombre}', 'tipo_permiso': 'Excepcion', 'num_permiso': quien_autoriza, 'local': local, 'tarea': 'N/A', 'vence': vence_str}
                 else:
-                    print(f"   - Permiso encontrado en Excepciones pero está vencido.")
+                    logger.debug(f"Excepción vencida para DNI {dni_limpio_str}")
             else:
-                print("   - DNI no encontrado en Excepciones.")
+                logger.debug(f"DNI {dni_limpio_str} no encontrado en Excepciones")
 
         # --- 5. Decisión final si no se encontró permiso válido ---
-        print(f"\nDEBUG: 5. Decisión final para DNI '{dni_limpio_str}'. No se encontró permiso válido en ninguna lista.")
+        logger.warning(f"Acceso DENEGADO - DNI: {dni_limpio_str} no encontrado o sin permiso vigente")
+        log_access_event(dni_limpio_str, 'No Autorizado', 'DENEGADO', 'N/A', 'Sin permiso válido')
         mensaje = f'ACCESO DENEGADO: DNI {dni_limpio_str} no encontrado o sin permiso vigente.'
         registrar_evento(dni_limpio_str, 'No Autorizado', hora_actual_str, 'Entrada RECHAZADA', 'N/A', 'N/A', 'N/A', 'N/A', 'DENEGADO')
         return {'acceso': 'DENEGADO', 'nombre': 'No Autorizado', 'mensaje': mensaje}

@@ -591,18 +591,78 @@ document.addEventListener('DOMContentLoaded', () => {
 
         loadNominasGuardadas();
 
+        async function downloadFile(url) {
+            const statusElement = document.getElementById('reporteStatus');
+            if (statusElement) {
+                statusElement.textContent = 'Preparando descarga...';
+                statusElement.className = 'status-message';
+            }
+
+            try {
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(errorText || `Error del servidor: ${response.status}`);
+                }
+
+                const disposition = response.headers.get('Content-Disposition');
+                let filename = "reporte.xlsx";
+                if (disposition && disposition.includes('attachment')) {
+                    const filenameMatch = disposition.match(/filename="([^"]+)"/);
+                    if (filenameMatch && filenameMatch.length > 1) {
+                        filename = filenameMatch[1];
+                    }
+                }
+
+                const blob = await response.blob();
+
+                const reader = new FileReader();
+                reader.readAsDataURL(blob);
+                reader.onloadend = async () => {
+                    const base64data = reader.result;
+                    const content_base64 = base64data.split(',')[1];
+
+                    try {
+                        const result = await window.pywebview.api.save_file_dialog({
+                            filename: filename,
+                            content: content_base64
+                        });
+
+                        if (result.success) {
+                            if (statusElement) {
+                                statusElement.textContent = result.message;
+                                statusElement.className = 'status-message success';
+                            }
+                        } else {
+                            throw new Error(result.message);
+                        }
+                    } catch (e) {
+                        throw new Error('La API de Pywebview no está disponible. ' + e.message);
+                    }
+                };
+
+            } catch (error) {
+                console.error('Download failed:', error);
+                if (statusElement) {
+                    statusElement.textContent = `Error en la descarga: ${error.message}`;
+                    statusElement.className = 'status-message error';
+                }
+            }
+        }
+
         // Descargar Reporte Diario
         const descargarReporteBtn = document.getElementById('descargarReporteBtn');
         if (descargarReporteBtn) {
             descargarReporteBtn.addEventListener('click', () => {
-                window.location.href = '/descargar_reporte_diario';
+                downloadFile('/descargar_reporte_diario');
             });
         }
 
         const descargarFichajesBtn = document.getElementById('descargarFichajesBtn');
         if (descargarFichajesBtn) {
             descargarFichajesBtn.addEventListener('click', () => {
-                window.location.href = '/descargar_reporte_fichajes';
+                downloadFile('/descargar_reporte_fichajes');
             });
         }
 
@@ -633,3 +693,61 @@ document.addEventListener('DOMContentLoaded', () => {
 
     }
 });
+// Código JavaScript para agregar al final de script.js
+// Manejo de descarga de reportes con fechas
+
+// Descargar Reporte de Accesos
+if (document.getElementById('descargarReporteBtn')) {
+    document.getElementById('descargarReporteBtn').addEventListener('click', function() {
+        const fechaDesde = document.getElementById('fechaDesdeReporte').value;
+        const fechaHasta = document.getElementById('fechaHastaReporte').value;
+        
+        let url = '/descargar_reporte_fechas?';
+        if (fechaDesde) url += `desde=${fechaDesde}&`;
+        if (fechaHasta) url += `hasta=${fechaHasta}`;
+        
+        // Abrir en nueva ventana para descargar
+        window.open(url, '_blank');
+        
+        const statusEl = document.getElementById('reporteStatus');
+        if (statusEl) {
+            if (fechaDesde && fechaHasta && fechaDesde !== fechaHasta) {
+                statusEl.textContent = `Descargando reporte del ${fechaDesde} al ${fechaHasta}...`;
+            } else if (fechaDesde || fechaHasta) {
+                const fecha = fechaDesde || fechaHasta;
+                statusEl.textContent = `Descargando reporte del ${fecha}...`;
+            } else {
+                statusEl.textContent = 'Descargando reporte de hoy...';
+            }
+            statusEl.style.color = '#4CAF50';
+        }
+    });
+}
+
+// Descargar Reporte de Fichajes
+if (document.getElementById('descargarFichajesBtn')) {
+    document.getElementById('descargarFichajesBtn').addEventListener('click', function() {
+        const fechaDesde = document.getElementById('fechaDesdeReporte').value;
+        const fechaHasta = document.getElementById('fechaHastaReporte').value;
+        
+        let url = '/descargar_fichajes_fechas?';
+        if (fechaDesde) url += `desde=${fechaDesde}&`;
+        if (fechaHasta) url += `hasta=${fechaHasta}`;
+        
+        // Abrir en nueva ventana para descargar
+        window.open(url, '_blank');
+        
+        const statusEl = document.getElementById('reporteStatus');
+        if (statusEl) {
+            if (fechaDesde && fechaHasta && fechaDesde !== fechaHasta) {
+                statusEl.textContent = `Descargando fichajes del ${fechaDesde} al ${fechaHasta}...`;
+            } else if (fechaDesde || fechaHasta) {
+                const fecha = fechaDesde || fechaHasta;
+                statusEl.textContent = `Descargando fichajes del ${fecha}...`;
+            } else {
+                statusEl.textContent = 'Descargando fichajes de hoy...';
+            }
+            statusEl.style.color = '#4CAF50';
+        }
+    });
+}

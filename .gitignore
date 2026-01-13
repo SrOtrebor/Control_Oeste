@@ -1,0 +1,84 @@
+# ============================================
+# ARCHIVOS SENSIBLES Y CREDENCIALES
+# ============================================
+.env
+*.env
+!.env.example
+
+# ============================================
+# LOGS Y DATOS TEMPORALES
+# ============================================
+logs/
+*.log
+temp/
+*.tmp
+
+# ============================================
+# BACKUPS Y DATOS
+# ============================================
+backups/
+registros_diarios/
+registros_fichajes/
+registros_visitas/
+
+# Archivos Excel de datos (opcional, descomentar si no quieres subirlos)
+# ListadoFAPs.xlsx
+# ListadoFAOs.xlsx
+# excepciones.xlsx
+# nominas_persistentes.xlsx
+
+# ============================================
+# PYTHON
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ============================================
+# PYINSTALLER
+# ============================================
+*.spec
+build/
+dist/
+
+# ============================================
+# ENTORNOS VIRTUALES
+# ============================================
+venv/
+ENV/
+env/
+.venv
+
+# ============================================
+# IDEs
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ============================================
+# WINDOWS
+# ============================================
+Thumbs.db
+ehthumbs.db
+Desktop.ini
