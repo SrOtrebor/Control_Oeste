@@ -306,12 +306,11 @@ if __name__ == '__main__':
                     total_adentro = 0
                     
                     # Calcular total adentro
-                    with get_db_connection() as conn:
-                        cursor = conn.cursor()
-                        cursor.execute("SELECT COUNT(DISTINCT dni) as count FROM estado_adentro")
-                        row = cursor.fetchone()
-                        if row:
-                            total_adentro = row['count']
+                    try:
+                        docs = db.collection('estado_adentro').get()
+                        total_adentro = len(docs)
+                    except Exception as e:
+                        logger.error(f"Error contando estado_adentro: {e}")
                     
                     db.collection('config').document('live_stats').set({
                         'total_adentro': total_adentro,

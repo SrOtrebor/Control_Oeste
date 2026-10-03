@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, query, where, getDocs, onSnapshot, serverTimestamp, doc, getDoc, updateDoc, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, query, where, getDocs, onSnapshot, serverTimestamp, doc, getDoc, updateDoc, setDoc, deleteDoc, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyBg0ht9KWgGrhGmHkT7mzCRgJ2CS6e4-lQ",
@@ -352,6 +352,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }).catch(error => {
             console.error('Error escribiendo en Firestore:', error);
         });
+
+        // Mantener estado_adentro para conteo en vivo
+        if (acceso === 'PERMITIDO') {
+            if (evento === 'ENTRADA') {
+                setDoc(doc(db, "estado_adentro", parsed.dni), {
+                    DNI: parsed.dni,
+                    nombre: fullName || 'No Encontrado',
+                    hora: nowTime,
+                    fecha: nowDate,
+                    tipo_permiso: tipoPermiso
+                }).catch(e => console.error(e));
+            } else if (evento === 'SALIDA') {
+                deleteDoc(doc(db, "estado_adentro", parsed.dni)).catch(e => console.error(e));
+            }
+        }
 
         mostrarResultado(colorClass, mensaje, fullName, localInfo, tipoPermiso, '');
     }
