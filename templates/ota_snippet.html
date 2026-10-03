@@ -1,0 +1,24 @@
+                <!-- Panel Actualizaciones Remotas -->
+                <div class="config-card" style="background: var(--dash-surface-hover); padding: 1.5rem; border-radius: var(--dash-radius); border: 1px solid var(--dash-border); margin-top: 2rem;">
+                    <h3 style="margin-bottom: 1rem; color: var(--dash-primary); display: flex; align-items: center; gap: 0.5rem;">
+                        <span class="material-icons">cloud_upload</span> Actualizaciones del Sistema (OTA)
+                    </h3>
+                    <p style="font-size: 0.85rem; color: var(--dash-text-muted); margin-bottom: 1.5rem;">
+                        Sube un archivo <code style="background: #333; padding: 2px 4px; border-radius: 4px;">.py</code> o un paquete <code style="background: #333; padding: 2px 4px; border-radius: 4px;">.zip</code> para parchear el código de la garita de forma remota. El sistema se reiniciará automáticamente.
+                    </p>
+                    
+                    <form id="formOtaUpdate" style="display: flex; flex-direction: column; gap: 1rem; max-width: 500px;">
+                        <div class="filter-group">
+                            <label>Archivo de Parche (.py o .zip)</label>
+                            <input type="file" id="otaFile" class="dash-input" accept=".py,.zip" required>
+                        </div>
+                        <div class="filter-group">
+                            <label>Contraseña de Administrador</label>
+                            <input type="password" id="otaPassword" class="dash-input" required placeholder="Requerido por seguridad">
+                        </div>
+                        <button type="submit" class="dash-btn dash-btn-primary" id="btnUploadOta" style="justify-content: center;">
+                            <span class="material-icons">upload</span> Aplicar Parche y Reiniciar
+                        </button>
+                    </form>
+                    <p id="otaStatusMsg" style="font-size: 0.85rem; margin-top: 1rem; display: none; font-weight: 500;"></p>
+                </div>

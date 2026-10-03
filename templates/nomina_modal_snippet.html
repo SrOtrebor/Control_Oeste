@@ -1,0 +1,208 @@
+<!-- Modal: ABM Personal (Ex Nómina Form) -->
+<div id="modalNomina" class="modal">
+    <div class="modal-content abm-modal-content">
+        <div class="modal-header">
+            <h2 id="modalNominaTitle">Agregar Personal</h2>
+            <span class="close-modal" id="closeNominaModal">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="formNomina">
+                <input type="hidden" id="nominaId">
+                
+                <div class="abm-columns">
+                    <!-- Columna 1: Datos Personales -->
+                    <div class="abm-column">
+                        <h3 class="abm-section-title"><span class="material-icons">badge</span> Datos Personales</h3>
+                        
+                        <div class="filter-group mb-3">
+                            <label>DNI</label>
+                            <input type="text" id="nominaDni" class="dash-input" required placeholder="Sin puntos ni espacios">
+                        </div>
+                        
+                        <div class="filter-group mb-3">
+                            <label>Nombre y Apellido</label>
+                            <input type="text" id="nominaNombre" class="dash-input" required>
+                        </div>
+                        
+                        <div class="filter-group mb-3">
+                            <label>Empresa Contratista</label>
+                            <select id="nominaEmpresa" class="dash-select" required>
+                                <option value="">Cargando Empresas...</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-group mb-3">
+                            <label>Tipo de Empleado</label>
+                            <select id="nominaTipoEmpleado" class="dash-select" required>
+                                <option value="">Seleccionar Tipo...</option>
+                                <option value="Seguridad">Seguridad</option>
+                                <option value="Limpieza">Limpieza</option>
+                                <option value="Mantenimiento">Mantenimiento</option>
+                                <option value="Administración">Administración</option>
+                                <option value="Otro">Otro</option>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group mb-3">
+                            <label>Puesto Físico (Por Defecto)</label>
+                            <select id="nominaPuestoFisico" class="dash-select">
+                                <option value="">Cargando Puestos...</option>
+                            </select>
+                            <small class="dash-text-muted">Puesto habitual. Podrá cambiarse en vivo al fichar.</small>
+                        </div>
+                        
+                        <div class="filter-group mb-3">
+                            <label>Estado</label>
+                            <select id="nominaActivo" class="dash-select">
+                                <option value="1">Activo (Permitir Ingreso)</option>
+                                <option value="0">Bloqueado (No Permitir)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Columna 2: Foto y Biometría -->
+                    <div class="abm-column bio-column">
+                        <h3 class="abm-section-title"><span class="material-icons">camera_alt</span> Fotografía</h3>
+                        <div class="photo-container mb-3" style="text-align: center;">
+                            <video id="webcamVideo" autoplay playsinline style="display:none; width: 100%; border-radius: var(--dash-radius); border: 1px solid var(--dash-border);"></video>
+                            <canvas id="photoCanvas" style="display:none;"></canvas>
+                            <img id="nominaFotoPreview" src="/static/assets/default-avatar.png" alt="Foto Empleado" style="max-width: 150px; border-radius: var(--dash-radius); border: 2px solid var(--dash-border); margin-bottom: 1rem;">
+                            
+                            <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                                <label class="dash-btn dash-btn-outline" style="cursor: pointer;">
+                                    <span class="material-icons">upload_file</span> Subir
+                                    <input type="file" id="nominaFotoUpload" accept="image/*" style="display:none;">
+                                </label>
+                                <button type="button" class="dash-btn dash-btn-secondary" id="btnActivarCamara"><span class="material-icons">photo_camera</span> Cámara</button>
+                                <button type="button" class="dash-btn dash-btn-primary" id="btnTomarFoto" style="display:none;"><span class="material-icons">camera</span> Capturar</button>
+                            </div>
+                            <input type="hidden" id="nominaFotoB64">
+                        </div>
+
+                        <h3 class="abm-section-title"><span class="material-icons">fingerprint</span> Biometría SecuGen</h3>
+                        
+                        <div class="bio-status-card">
+                            <div class="bio-icon-container">
+                                <span class="material-icons bio-icon" id="bioStatusIcon">fingerprint</span>
+                            </div>
+                            <h4 id="bioStatusTitle">Sin huella registrada</h4>
+                            <p id="bioStatusDesc" class="dash-text-muted">Conecte el lector SecuGen Hamster Plus y presione capturar.</p>
+                        </div>
+
+                        <button type="button" class="dash-btn dash-btn-secondary bio-btn" id="btnCapturarHuella">
+                            <span class="material-icons">scanner</span> Capturar Huella
+                        </button>
+                        
+                        <input type="hidden" id="nominaHuellaTemplate" value="">
+                    </div>
+                </div>
+                
+                <div class="abm-actions">
+                    <button type="button" class="dash-btn dash-btn-outline" id="btnCancelarNomina">Cancelar</button>
+                    <button type="submit" class="dash-btn dash-btn-primary">Guardar Empleado</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Estilos Premium para el ABM Modal */
+.abm-modal-content {
+    max-width: 900px;
+    width: 95%;
+}
+
+.abm-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.mb-3 {
+    margin-bottom: 1.25rem;
+}
+
+.abm-section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--dash-primary);
+    border-bottom: 1px solid var(--dash-border);
+    padding-bottom: 0.5rem;
+}
+
+/* Biometría Card */
+.bio-column {
+    display: flex;
+    flex-direction: column;
+}
+
+.bio-status-card {
+    background: var(--dash-surface-hover);
+    border: 1px dashed var(--dash-border);
+    border-radius: var(--dash-radius);
+    padding: 1.5rem;
+    text-align: center;
+    margin-bottom: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: var(--dash-transition);
+}
+
+.bio-status-card.success {
+    border-color: var(--dash-success);
+    background: var(--dash-success-glow);
+}
+
+.bio-icon-container {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.05);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+}
+
+.bio-icon {
+    font-size: 2.5rem;
+    color: var(--dash-text-muted);
+}
+
+.bio-status-card.success .bio-icon {
+    color: var(--dash-success);
+}
+
+.bio-btn {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.1rem;
+    padding: 0.75rem;
+}
+
+.abm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    border-top: 1px solid var(--dash-border);
+    padding-top: 1.5rem;
+}
+
+.dash-text-muted {
+    color: var(--dash-text-muted);
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+    display: block;
+}
+</style>

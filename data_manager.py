@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import pandas as pd
@@ -130,12 +131,12 @@ def cargar_autorizaciones():
     global df_fap, ult_mod_fap, df_fao, ult_mod_fao, df_excepciones, ult_mod_excepciones, df_nominas, ult_mod_nominas
     
     mapa_cols_fap = {COL_DNI_FAP_ORIGINAL: COL_DNI, COL_NOMBRE_FAP_ORIGINAL: 'Nombre', COL_APELLIDO_FAP_ORIGINAL: 'Apellido', COL_NUM_PERMISO_FAP_ORIGINAL: COL_NUM_PERMISO, COL_VENCE_FAP_ORIGINAL: COL_VENCE, COL_LOCAL_FAP_ORIGINAL: COL_LOCAL}
-    df_fap, ult_mod_fap = cargar_y_procesar_excel(EXCEL_FAP, ult_mod_fap, 'FAP', mapa_cols_fap, df_fap, header=1, dni_col_original=COL_DNI_FAP_ORIGINAL)
+    df_fap, ult_mod_fap = cargar_y_procesar_excel(EXCEL_FAP, ult_mod_fap, 'FAP', mapa_cols_fap, df_fap, header=0, dni_col_original=COL_DNI_FAP_ORIGINAL)
     if not df_fap.empty and COL_VENCE in df_fap.columns:
         df_fap[COL_VENCE] = pd.to_datetime(df_fap[COL_VENCE], format='%d/%m/%Y', errors='coerce')
 
     mapa_cols_fao = {COL_DNI_FAO_ORIGINAL: COL_DNI, COL_NOMBRE_FAO_ORIGINAL: 'Nombre', COL_APELLIDO_FAO_ORIGINAL: 'Apellido', COL_NUM_PERMISO_FAO_ORIGINAL: COL_NUM_PERMISO, COL_VENCE_FAO_ORIGINAL: COL_VENCE, COL_LOCAL_FAO_ORIGINAL: COL_LOCAL, COL_TAREA_FAO_ORIGINAL: COL_TAREA}
-    df_fao, ult_mod_fao = cargar_y_procesar_excel(EXCEL_FAO, ult_mod_fao, 'FAO', mapa_cols_fao, df_fao, header=1, dni_col_original=COL_DNI_FAO_ORIGINAL)
+    df_fao, ult_mod_fao = cargar_y_procesar_excel(EXCEL_FAO, ult_mod_fao, 'FAO', mapa_cols_fao, df_fao, header=0, dni_col_original=COL_DNI_FAO_ORIGINAL)
     if not df_fao.empty and COL_VENCE in df_fao.columns:
         df_fao[COL_VENCE] = pd.to_datetime(df_fao[COL_VENCE], format='%d/%m/%Y', errors='coerce')
     
@@ -422,116 +423,97 @@ def recargar_cache_nominas_persistentes():
 
 def procesar_nomina_texto(texto_nomina):
     """
-    Procesa un string multilínea que contiene una nómina de personal
-    y la convierte en una lista de diccionarios.
-    La lógica de parseo es robusta para manejar diferentes espaciados y formatos.
+    Parsea un texto libre buscando DNIs y nombres.
+    Soporta formatos flexibles (con o sin saltos de línea) buscando DNIs y el texto que los acompaña.
     """
-    logger.debug("INICIANDO PROCESAMIENTO DE NÓMINA ---")
-    lineas = texto_nomina.strip().splitlines() # Usar splitlines() para mejor manejo de saltos de línea
+    logger.debug("INICIANDO PROCESAMIENTO DE NÓMINA HÍBRIDO ---")
+    texto_nomina = str(texto_nomina).strip()
+    if not texto_nomina:
+        return []
+
     personas_final = []
-
-    # Expresiones regulares para varios formatos de línea.
-    # Se procesan en orden. La primera que coincida se usa.
-    formatos_regex = [
-        # Formato 1: "C.U.I.L. 20408951853 ABALOS AXEL SEBASTIAN" (y variantes)
-        (1, re.compile(r"^(?:C\.?U\.?I\.?L\.?[:\s]*)(?P<cuil>\d{11})\s+(?P<nombre_completo>.*)", re.IGNORECASE)),
+    
+    # 1. Eliminar fechas comunes (dd/mm/yyyy o dd-mm-yyyy) para que no confundan
+    texto_limpio = re.sub(r'\b\d{2}[/-]\d{2}[/-]\d{2,4}\b', ' ', texto_nomina)
+    
+    # 2. Buscar DNIs o CUILs
+    # Buscamos 7-8 dígitos o 11 dígitos (CUIL)
+    # patron = buscar DNI (7-8 dígitos aislados) o CUIL
+    patron_doc = r'\b(?:20|23|24|27|30)?-?(\d{7,8})-?\d?\b'
+    
+    # Vamos a extraer usando finditer para mantener el orden
+    matches = list(re.finditer(patron_doc, texto_limpio))
+    
+    if not matches:
+        # Intentar formato original por si falla
+        pass
         
-        # Formato 2: "20-12345678-9 APELLIDO NOMBRE" (CUIL con guiones al inicio)
-        (2, re.compile(r"^(?P<cuil>\d{2}-\d{7,8}-\d{1})\s+(?P<nombre_completo>.*)", re.IGNORECASE)),
-
-        # Formato 3: "20365205044 11 FIGUEROA WALTER..." (CUIL, un número, y nombre)
-        (3, re.compile(r"^(?P<cuil>\d{11})\s+\d+\s+(?P<nombre_completo>.*)", re.IGNORECASE)),
-
-        # Formato 4: "20365205044 FIGUEROA WALTER..." (CUIL y nombre)
-        (4, re.compile(r"^(?P<cuil>\d{11})\s+(?P<nombre_completo>.*)", re.IGNORECASE)),
-
-        # Formato 5: DNI (7-8 digitos) y nombre
-        (5, re.compile(r"^(?P<dni>\d{7,8})\s+(?P<nombre_completo>.*)", re.IGNORECASE)),
-
-        # Formato 6: "APELLIDO NOMBRE 20-12345678-9" (CUIL con guiones al final)
-        (6, re.compile(r"^(?P<nombre_completo>.*?)\s+(?P<cuil>\d{2}-\d{7,8}-\d{1})$", re.IGNORECASE)),
-    ]
-
-    logger.debug(f"Texto recibido para procesar:\n---\n{texto_nomina}\n---")
-    logger.debug(f"Procesando {len(lineas)} líneas.")
-
-    for i, linea in enumerate(lineas):
-        linea = linea.strip()
-        print(f"\n[Línea {i+1}]: '{linea}'")
-        if not linea:
-            logger.debug("Línea vacía, ignorando.")
-            continue
-
-        # Ignorar encabezados comunes
-        if any(h in linea.upper() for h in ['CUIL', 'APELLIDO', 'NOMBRE', 'LEGAJO', 'LEGAJOS']):
-            logger.debug("Línea parece un encabezado, ignorando.")
-            continue
-
-        match = None
-        matched_format = 0
-        for fmt, regex in formatos_regex:
-            match = regex.match(linea)
-            if match:
-                matched_format = fmt
-                break
+    if matches:
+        # Separar el texto usando los DNIs como delimitadores
+        partes_texto = re.split(patron_doc, texto_limpio)
         
-        if not match:
-            logger.debug(f"ADVERTENCIA: La línea no coincide con ningún formato conocido.")
-            continue
-
-        logger.debug(f"Coincide con formato #{matched_format}.")
-
-        try:
-            datos = match.groupdict()
-            logger.debug(f"Datos extraídos: {datos}")
-            dni = ""
-            apellido = ""
-            nombre = ""
-
-            if 'cuil' in datos:
-                dni = extraer_dni_de_cuil(datos['cuil'])
-                logger.debug(f"CUIL '{datos['cuil']}' -> DNI '{dni}'")
-            elif 'dni' in datos:
-                dni = datos['dni']
-                logger.debug(f"DNI encontrado: '{dni}'")
-
-            nombre_completo_str = datos.get('nombre_completo', '').strip()
+        # El split con grupo de captura devuelve: [texto_antes_dni1, dni1, texto_entre_dni1_y_dni2, dni2, ...]
+        # indices impares son los DNIs, indices pares son los textos
+        
+        dnis = []
+        textos = []
+        for i in range(1, len(partes_texto), 2):
+            dnis.append(partes_texto[i])
+        
+        # Los nombres pueden estar antes o después del DNI.
+        # Asumimos que normalmente el nombre está justo antes o justo después.
+        # Extraeremos nombres (secuencias de letras)
+        for i, dni in enumerate(dnis):
+            texto_antes = partes_texto[i * 2]
+            texto_despues = partes_texto[(i * 2) + 2] if (i * 2) + 2 < len(partes_texto) else ""
             
-            # Eliminar "Régimen General" si está al final
-            if nombre_completo_str.lower().endswith("régimen general"):
-                nombre_completo_str = nombre_completo_str[:-15].strip()
-
-            if not nombre_completo_str:
-                logger.debug(f"ADVERTENCIA: No se pudo extraer el nombre completo.")
-                continue
-
-            logger.debug(f"Nombre completo a procesar: '{nombre_completo_str}'")
-            partes_nombre = nombre_completo_str.split()
+            # Buscar el nombre más cercano (antes o después)
+            patron_nombre = r'([A-Za-záéíóúÁÉÍÓÚñÑ\s,]{4,})'
             
-            # Lógica para separar Apellido y Nombre
-            if len(partes_nombre) >= 2:
-                # Asume que la primera palabra es el apellido y el resto es el nombre.
-                apellido = partes_nombre[0]
-                nombre = ' '.join(partes_nombre[1:])
-            elif len(partes_nombre) == 1:
-                # Si solo hay una palabra, se considera apellido.
-                apellido = partes_nombre[0]
-                nombre = ""
+            nombres_antes = re.findall(patron_nombre, texto_antes)
+            nombres_despues = re.findall(patron_nombre, texto_despues)
             
-            logger.debug(f"Apellido: '{apellido}', Nombre: '{nombre}'")
-
-            if dni and (nombre or apellido):
-                persona = {'DNI': dni, 'Apellido': apellido, 'Nombre': nombre}
-                personas_final.append(persona)
-                logger.debug(f"ÉXITO: Persona agregada: {persona}")
+            nombre_completo = ""
+            
+            # Limpiar nombres
+            def limpiar_n(n):
+                n_clean = re.sub(r'\s+', ' ', n).strip()
+                if len(n_clean) >= 4 and not any(skip in n_clean.upper() for skip in ['CUIL', 'APELLIDO', 'NOMBRE', 'LEGAJO']):
+                    return n_clean
+                return ""
+                
+            # Tomar el último nombre antes del DNI o el primero después
+            if nombres_antes and limpiar_n(nombres_antes[-1]):
+                nombre_completo = limpiar_n(nombres_antes[-1])
+            elif nombres_despues and limpiar_n(nombres_despues[0]):
+                nombre_completo = limpiar_n(nombres_despues[0])
+            
+            if nombre_completo:
+                if ',' in nombre_completo:
+                    partes = nombre_completo.split(',', 1)
+                    apellido = partes[0].strip()
+                    nombre = partes[1].strip()
+                else:
+                    partes = nombre_completo.split()
+                    if len(partes) > 1:
+                        apellido = partes[0]
+                        nombre = ' '.join(partes[1:])
+                    else:
+                        apellido = nombre_completo
+                        nombre = ''
+                        
+                personas_final.append({
+                    'DNI': dni,
+                    'Apellido': apellido.upper(),
+                    'Nombre': nombre.upper()
+                })
             else:
-                logger.debug(f"ADVERTENCIA: No se pudo extraer DNI o Nombre/Apellido válido.")
-
-        except (ValueError, IndexError) as e:
-            logger.debug(f"ERROR: La línea no pudo ser procesada, error: {e}.")
-            continue
-            
-    logger.debug(f"PROCESAMIENTO FINALIZADO: {len(personas_final)} personas encontradas. ---\n")
+                personas_final.append({
+                    'DNI': dni,
+                    'Apellido': 'DESCONOCIDO',
+                    'Nombre': 'DESCONOCIDO'
+                })
+    
     return personas_final
 
 def generar_reporte_consolidado():
@@ -586,4 +568,162 @@ def generar_reporte_consolidado():
     formatear_excel(nombre_archivo_temp)
 
     return nombre_archivo_temp, os.path.basename(nombre_archivo_temp)            
+
+
+def obtener_directorio_irsa():
+    """Retorna el listado consolidado de personal autorizado directo desde los JSONs de IRSA"""
+    directorio = []
     
+    try:
+        fao_path = os.path.join(BASE_DIR, 'MetadatosFAOs.json')
+        if os.path.exists(fao_path):
+            with open(fao_path, 'r', encoding='utf-8') as fa:
+                faos = json.load(fa)
+                for f in faos:
+                    # Solo estados válidos para acceso (Aprobado Parcial o Aprobado)
+                    if str(f.get('estado')) not in ['4', '6']:
+                        continue
+                        
+                    empresa = str(f.get('marca', '')).strip()
+                    vence = f.get('fechaFin', '').split('T')[0] if f.get('fechaFin') else ''
+                    
+                    if vence:
+                        try:
+                            dt = datetime.strptime(vence, '%Y-%m-%d')
+                            vence = dt.strftime('%d/%m/%Y')
+                        except:
+                            pass
+                            
+                    for p in f.get('personal', []):
+                        if p.get('activo'):
+                            nombre_completo = f"{p.get('nombre', '').strip()} {p.get('apellido', '').strip()}".strip()
+                            directorio.append({
+                                'dni': str(p.get('numeroDocumento', '')),
+                                'nombre': nombre_completo,
+                                'empresa': empresa,
+                                'vence': vence,
+                                'tipo': 'FAO',
+                                'numero': str(f.get('id', ''))
+                            })
+    except Exception as e:
+        logger.error(f"Error parseando directorio FAO JSON: {e}")
+
+    try:
+        fap_path = os.path.join(BASE_DIR, 'MetadatosFAPs.json')
+        if os.path.exists(fap_path):
+            with open(fap_path, 'r', encoding='utf-8') as fa:
+                faps = json.load(fa)
+                for f in faps:
+                    if str(f.get('estado')) not in ['4', '6']:
+                        continue
+                        
+                    empresa = str(f.get('local', '')).strip()
+                    vence = f.get('fechaFin', '').split('T')[0] if f.get('fechaFin') else ''
+                    
+                    if vence:
+                        try:
+                            dt = datetime.strptime(vence, '%Y-%m-%d')
+                            vence = dt.strftime('%d/%m/%Y')
+                        except:
+                            pass
+                            
+                    for p in f.get('personal', []):
+                        if p.get('activo'):
+                            nombre_completo = f"{p.get('nombre', '').strip()} {p.get('apellido', '').strip()}".strip()
+                            directorio.append({
+                                'dni': str(p.get('numeroDocumento', '')),
+                                'nombre': nombre_completo,
+                                'empresa': empresa,
+                                'vence': vence,
+                                'tipo': 'FAP',
+                                'numero': str(f.get('id', ''))
+                            })
+    except Exception as e:
+        logger.error(f"Error parseando directorio FAP JSON: {e}")
+
+    # Agregar también las autorizaciones locales (Nóminas y Excepciones) de la base de datos SQLite
+    try:
+        from database import get_db_connection
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM autorizaciones WHERE activo = 1")
+            for row in cursor.fetchall():
+                vence_local = row['fecha_fin'] if row['fecha_fin'] else ''
+                if vence_local:
+                    try:
+                        dt = datetime.strptime(vence_local, '%Y-%m-%d')
+                        vence_local = dt.strftime('%d/%m/%Y')
+                    except:
+                        pass
+                
+                nombre_completo_local = f"{row['nombre'] or ''} {row['apellido'] or ''}".strip()
+                directorio.append({
+                    'dni': str(row['dni']),
+                    'nombre': nombre_completo_local,
+                    'empresa': row['local'] or 'N/A',
+                    'vence': vence_local,
+                    'tipo': row['tipo_permiso'] or 'LOCAL',
+                    'numero': str(row['num_permiso'] or '')
+                })
+    except Exception as e:
+        logger.error(f"Error obteniendo autorizaciones locales para directorio: {e}")
+
+    return directorio
+
+def obtener_tramites_irsa_raw():
+    """Lee los MetadatosFAOs.json y MetadatosFAPs.json para mostrar los formularios originales"""
+    tramites = []
+    
+    # Mapeo de estados conocidos
+    estado_map = {
+        '3': 'Enviado',
+        '4': 'Aprobado Parcial',
+        '5': 'Requiere Cambios',
+        '6': 'Aprobado'
+    }
+
+    try:
+        fao_path = os.path.join(BASE_DIR, 'MetadatosFAOs.json')
+        if os.path.exists(fao_path):
+            with open(fao_path, 'r', encoding='utf-8') as fa:
+                faos = json.load(fa)
+                for f in faos:
+                    st_code = str(f.get('estado', ''))
+                    tramites.append({
+                        'id': f.get('id', ''),
+                        'tipo': 'FAO',
+                        'empresa': str(f.get('marca', '')).strip(),
+                        'fechaInicio': f.get('fechaInicio', '').split('T')[0] if f.get('fechaInicio') else '',
+                        'fechaFin': f.get('fechaFin', '').split('T')[0] if f.get('fechaFin') else '',
+                        'estado_codigo': st_code,
+                        'estado_nombre': estado_map.get(st_code, f"Desconocido ({st_code})"),
+                        'detalle': str(f.get('detalleTrabajo', '')).strip(),
+                        'trabajadores_count': len(f.get('personal', [])),
+                        'personal': f.get('personal', [])
+                    })
+    except Exception as e:
+        logger.error(f"Error leyendo MetadatosFAOs: {e}")
+
+    try:
+        fap_path = os.path.join(BASE_DIR, 'MetadatosFAPs.json')
+        if os.path.exists(fap_path):
+            with open(fap_path, 'r', encoding='utf-8') as fa:
+                faps = json.load(fa)
+                for f in faps:
+                    st_code = str(f.get('estado', ''))
+                    tramites.append({
+                        'id': f.get('id', ''),
+                        'tipo': 'FAP',
+                        'empresa': str(f.get('marca', '')).strip() or str(f.get('local', '')).strip(),
+                        'fechaInicio': f.get('fechaInicio', '').split('T')[0] if f.get('fechaInicio') else '',
+                        'fechaFin': f.get('fechaFin', '').split('T')[0] if f.get('fechaFin') else '',
+                        'estado_codigo': st_code,
+                        'estado_nombre': estado_map.get(st_code, f"Desconocido ({st_code})"),
+                        'detalle': str(f.get('detalleTrabajo', '')).strip(),
+                        'trabajadores_count': len(f.get('personal', [])),
+                        'personal': f.get('personal', [])
+                    })
+    except Exception as e:
+        logger.error(f"Error leyendo MetadatosFAPs: {e}")
+
+    return tramites

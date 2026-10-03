@@ -1,0 +1,17 @@
+                <!-- Panel Backups -->
+                <div class="config-card" style="background: var(--dash-surface-hover); padding: 1.5rem; border-radius: var(--dash-radius); border: 1px solid var(--dash-border); margin-top: 2rem;">
+                    <h3 style="margin-bottom: 1rem; color: var(--dash-primary); display: flex; align-items: center; gap: 0.5rem;">
+                        <span class="material-icons">save_alt</span> Respaldo del Sistema (Backups)
+                    </h3>
+                    <p style="font-size: 0.85rem; color: var(--dash-text-muted); margin-bottom: 1rem;">
+                        El sistema guarda una copia comprimida de la base de datos de forma automática todos los días a las 03:00 AM para proteger tus configuraciones, listas negras y nóminas.
+                    </p>
+                    <p style="font-size: 0.85rem; color: var(--dash-text-muted); margin-bottom: 1.5rem;">
+                        También podés descargar una copia de seguridad en este mismo instante para guardarla en tu computadora o en un pendrive:
+                    </p>
+                    
+                    <button class="dash-btn dash-btn-success" id="btnDownloadBackup" style="justify-content: center; width: 100%; max-width: 500px;">
+                        <span class="material-icons">download</span> Descargar Copia de Seguridad (.zip)
+                    </button>
+                    <p id="backupStatusMsg" style="font-size: 0.85rem; margin-top: 1rem; display: none; font-weight: 500;"></p>
+                </div>

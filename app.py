@@ -27,6 +27,7 @@ from flask import (
 from io import BytesIO
 
 # Local application imports
+import data_manager
 from config import (
     SECRET_KEY,
     ADMIN_USERNAME,
@@ -66,7 +67,10 @@ from utils import (
 )
 
 
+from flask_cors import CORS
+
 app = Flask(__name__)
+CORS(app) # Permitir llamadas locales desde Firebase Hosting
 app.secret_key = SECRET_KEY
 
 # Logger para este módulo
@@ -194,6 +198,40 @@ def perform_login():
 def logout():
     session.pop('logged_in', None)
     return redirect(url_for('home'))
+
+@app.route('/api/admin/create_user', methods=['POST'])
+def api_create_user():
+    data = request.get_json()
+    email = data.get('email')
+    password = data.get('password')
+    rol = data.get('rol')
+    
+    if not email or not password or not rol:
+        return jsonify({'success': False, 'message': 'Faltan datos'})
+        
+    try:
+        from firebase_admin import auth, firestore
+        import firebase_admin
+        from firebase_admin import credentials
+        
+        # Initialize if not already initialized
+        if not firebase_admin._apps:
+            cred = credentials.Certificate('serviceAccountKey.json')
+            firebase_admin.initialize_app(cred)
+            
+        db = firestore.client()
+        
+        user = auth.create_user(email=email, password=password)
+        db.collection('usuarios').document(user.uid).set({
+            'email': email,
+            'rol': rol,
+            'activo': True,
+            'centro_id': 'al_oeste'
+        })
+        return jsonify({'success': True, 'message': f'Usuario {email} creado con rol {rol}'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
 
 @app.route('/upload_excel', methods=['POST'])
 def upload_excel():
@@ -355,6 +393,29 @@ def agregar_excepcion():
     try:
         df_actual.to_excel(EXCEL_EXCEPCIONES, index=False, columns=columnas_excepcion)
         
+        # También guardar en SQLite para que el escáner y el dashboard lo vean inmediatamente
+        try:
+            from database import get_db_connection
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM autorizaciones WHERE dni=? AND tipo_permiso='EXCEPCION'", (dni_nuevo,))
+                
+                apellido_split = ""
+                nombre_split = nombre_nuevo
+                if " " in nombre_nuevo:
+                    partes = nombre_nuevo.split(" ", 1)
+                    nombre_split = partes[1]
+                    apellido_split = partes[0]
+                    
+                vigencia_str = vigencia_dt.strftime('%Y-%m-%d') if pd.notna(vigencia_dt) else ""
+                
+                cursor.execute('''
+                    INSERT INTO autorizaciones (dni, nombre, apellido, tipo_permiso, local, fecha_inicio, fecha_fin, activo)
+                    VALUES (?, ?, ?, 'EXCEPCION', ?, ?, ?, 1)
+                ''', (dni_nuevo, nombre_split, apellido_split, local_nuevo, fecha_alta_nueva, vigencia_str))
+        except Exception as sqlite_e:
+            logger.error(f"Error al guardar excepción en SQLite: {sqlite_e}")
+            
         cargar_autorizaciones()
         return jsonify({'success': True, 'message': mensaje_exito})
         
@@ -803,16 +864,366 @@ import time
 
 def run_flask():
     # use_reloader=False is important to prevent the app from running twice
-    app.run(port=5000, use_reloader=False) 
+    app.run(port=5050, use_reloader=False) 
+
+
+
+# ================= RECOVERED ENDPOINTS =================
+
+@app.route('/dashboard')
+def dashboard():
+    if 'logged_in' not in session:
+        return redirect(url_for('login_page'))
+    return render_template('dashboard.html')
+
+@app.route('/api/dashboard/stats')
+def api_dashboard_stats():
+    # Solo un dummy o la lógica que use la bd SQLite
+    try:
+        from db_queries import get_db_connection
+        hoy = datetime.now().strftime('%Y-%m-%d')
+        with get_db_connection() as conn:
+            c = conn.cursor()
+            c.execute("SELECT COUNT(*) as c FROM registros_accesos WHERE fecha = ? AND evento = 'ENTRADA'", (hoy,))
+            entradas = c.fetchone()['c']
+            c.execute("SELECT COUNT(*) as c FROM registros_accesos WHERE fecha = ? AND evento = 'SALIDA'", (hoy,))
+            salidas = c.fetchone()['c']
+            c.execute("SELECT COUNT(*) as c FROM registros_accesos WHERE fecha = ? AND evento = 'ENTRADA_RECHAZADA'", (hoy,))
+            rechazos = c.fetchone()['c']
+            c.execute("SELECT COUNT(*) as c FROM estado_adentro")
+            adentro = c.fetchone()['c']
+            c.execute("SELECT COUNT(*) as c FROM registros_accesos WHERE fecha = ? AND tipo_permiso = 'Visita'", (hoy,))
+            visitas = c.fetchone()['c']
+            c.execute("SELECT COUNT(*) as c FROM registros_fichajes WHERE fecha = ?", (hoy,))
+            fichajes_hoy = c.fetchone()['c']
+            return jsonify({
+                'success': True, 
+                'total_adentro': adentro,
+                'entradas': entradas,
+                'salidas': salidas,
+                'rechazos': rechazos,
+                'visitas': visitas,
+                'fichajes_hoy': fichajes_hoy,
+                'ultima_actualizacion': datetime.now().strftime('%H:%M:%S')
+            })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/dashboard/accesos_hoy')
+def api_dashboard_accesos_hoy():
+    try:
+        from db_queries import get_db_connection
+        hoy = datetime.now().strftime('%Y-%m-%d')
+        with get_db_connection() as conn:
+            c = conn.cursor()
+            c.execute("SELECT * FROM registros_accesos WHERE fecha = ? ORDER BY hora DESC", (hoy,))
+            return jsonify({'success': True, 'records': [dict(r) for r in c.fetchall()]})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/dashboard/fichajes_hoy')
+def api_dashboard_fichajes_hoy():
+    try:
+        from db_queries import get_db_connection
+        hoy = datetime.now().strftime('%Y-%m-%d')
+        with get_db_connection() as conn:
+            c = conn.cursor()
+            c.execute("SELECT * FROM registros_fichajes WHERE fecha = ? ORDER BY hora_entrada DESC", (hoy,))
+            return jsonify({'success': True, 'records': [dict(r) for r in c.fetchall()]})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/dashboard/directorio_irsa')
+def api_dashboard_directorio_irsa():
+    try:
+        directorio = data_manager.obtener_directorio_irsa()
+        return jsonify({'success': True, 'data': directorio})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/dashboard/tramites_irsa')
+def api_dashboard_tramites_irsa():
+    try:
+        tramites = data_manager.obtener_tramites_irsa_raw()
+        return jsonify({'success': True, 'data': tramites})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/dashboard/auditoria')
+def api_dashboard_auditoria():
+    return jsonify({'success': True, 'records': []})
+
+@app.route('/api/config/irsa', methods=['GET', 'POST'])
+def api_config_irsa():
+    if 'logged_in' not in session:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 403
+    
+    from irsa_config import save_irsa_credentials, get_irsa_credentials, has_irsa_credentials
+    
+    if request.method == 'POST':
+        data = request.get_json()
+        username = data.get('username', '').strip()
+        password = data.get('password', '').strip()
+        dias_alerta = int(data.get('dias_alerta_vencimiento', 0) or 0)
+        
+        if not username:
+            return jsonify({'success': False, 'message': 'El usuario no puede estar vacío.'})
+        
+        # Si no mandaron contraseña, mantenemos la existente
+        if not password:
+            creds = get_irsa_credentials()
+            if creds:
+                password = creds.get('password', '')
+            else:
+                return jsonify({'success': False, 'message': 'Ingresá la contraseña por primera vez.'})
+        
+        try:
+            save_irsa_credentials(username, password, dias_alerta_vencimiento=dias_alerta)
+            return jsonify({'success': True, 'message': '✅ Credenciales guardadas correctamente.'})
+        except Exception as e:
+            logger.error(f"Error guardando credenciales IRSA: {e}")
+            return jsonify({'success': False, 'message': f'Error al guardar: {str(e)}'})
+    
+    else:  # GET
+        try:
+            has_creds = has_irsa_credentials()
+            creds = get_irsa_credentials() if has_creds else None
+            return jsonify({
+                'success': True,
+                'has_credentials': has_creds,
+                'username': creds.get('username', '') if creds else '',
+                'dias_alerta_vencimiento': creds.get('dias_alerta_vencimiento', 0) if creds else 0,
+                'last_sync': None
+            })
+        except Exception as e:
+            return jsonify({'success': True, 'has_credentials': False, 'username': '', 'dias_alerta_vencimiento': 0, 'last_sync': None})
+
+@app.route('/api/dashboard/nominas', methods=['GET'])
+def api_dashboard_nominas():
+    try:
+        data = data_manager.get_nominas_agrupadas()
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/dashboard/nomina', methods=['POST'])
+def api_dashboard_nomina():
+    if 'logged_in' not in session: return jsonify({'success': False}), 403
+    try:
+        data = request.json
+        # Check if it's the old bulk text parse
+        if 'texto' in data:
+            res = data_manager.procesar_nomina_texto(data['texto'])
+            return jsonify(res)
+        
+        # New individual ABM
+        from db_queries import guardar_empleado_nomina
+        s, m = guardar_empleado_nomina(data)
+        return jsonify({'success': s, 'message': m})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
+@app.route('/api/dashboard/nomina/<int:id>', methods=['DELETE'])
+def api_dashboard_nomina_delete_id(id):
+    if 'logged_in' not in session: return jsonify({'success': False}), 403
+    try:
+        from db_queries import eliminar_empleado_nomina
+        s, m = eliminar_empleado_nomina(id)
+        return jsonify({'success': s, 'message': m})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/dashboard/lista_negra', methods=['GET', 'POST'])
+def api_dashboard_lista_negra():
+    return jsonify({'success': True, 'data': []})
+
+@app.route('/api/dashboard/lista_negra/<int:id>', methods=['DELETE'])
+def api_dashboard_lista_negra_del(id):
+    return jsonify({'success': True})
+
+@app.route('/api/sync/irsa', methods=['POST'])
+def api_sync_irsa():
+    try:
+        from irsa_client import IRSAClient
+        client = IRSAClient()
+        stats = client.sincronizar_todo()
+        mensaje = f'Éxito: {stats["faos_procesados"]} FAOs, {stats["faps_procesados"]} FAPs'
+        return jsonify({'success': True, 'message': mensaje})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/admin/backup/download', methods=['GET'])
+def api_admin_backup_download():
+    return jsonify({'success': False, 'message': 'Not implemented'})
+
+@app.route('/stream/alerts')
+def stream_alerts():
+    from alert_manager import stream_alerts as stream_alerts_gen
+    from flask import Response
+    return Response(stream_alerts_gen(), mimetype='text/event-stream')
+
+# PUESTOS OPERATIVOS
+@app.route('/api/config/puestos', methods=['GET', 'POST'])
+def api_config_puestos():
+    if request.method == 'GET':
+        from db_queries import obtener_puestos_operativos
+        return jsonify({'success': True, 'data': obtener_puestos_operativos()})
+    else:
+        from db_queries import agregar_puesto_operativo
+        data = request.json
+        s, m = agregar_puesto_operativo(data.get('nombre', ''))
+        return jsonify({'success': s, 'message': m})
+
+@app.route('/api/config/puestos/<int:id>', methods=['DELETE'])
+def api_config_puestos_del(id):
+    from db_queries import eliminar_puesto_operativo
+    s, m = eliminar_puesto_operativo(id)
+    return jsonify({'success': s, 'message': m})
+
+
+
+# ABM PUESTOS FISICOS
+@app.route('/api/config/puestos_fisicos', methods=['GET', 'POST'])
+def api_config_puestos_fisicos():
+    if request.method == 'GET':
+        from db_queries import obtener_puestos_fisicos
+        return jsonify({'success': True, 'data': obtener_puestos_fisicos()})
+    else:
+        from db_queries import agregar_puesto_fisico
+        data = request.json
+        s, m = agregar_puesto_fisico(data.get('nombre', ''), data.get('sector', ''), data.get('hora_inicio', ''), data.get('hora_fin', ''))
+        return jsonify({'success': s, 'message': m})
+
+@app.route('/api/config/puestos_fisicos/<int:id>', methods=['DELETE'])
+def api_config_puestos_fisicos_del(id):
+    from db_queries import eliminar_puesto_fisico
+    s, m = eliminar_puesto_fisico(id)
+    return jsonify({'success': s, 'message': m})
+
+# ABM EMPRESAS CONTRATISTAS
+@app.route('/api/config/empresas', methods=['GET', 'POST'])
+def api_config_empresas():
+    if request.method == 'GET':
+        from db_queries import obtener_empresas
+        return jsonify({'success': True, 'data': obtener_empresas()})
+    else:
+        from db_queries import agregar_empresa
+        data = request.json
+        s, m = agregar_empresa(data.get('nombre', ''))
+        return jsonify({'success': s, 'message': m})
+
+@app.route('/api/config/empresas/<int:id>', methods=['DELETE'])
+def api_config_empresas_del(id):
+    from db_queries import eliminar_empresa
+    s, m = eliminar_empresa(id)
+    return jsonify({'success': s, 'message': m})
+
+
+# RUTAS DE FICHAJE BIOMÉTRICO (SIMULADAS)
+@app.route('/api/biometria/identificar', methods=['POST'])
+def api_biometria_identificar():
+    # Simula la lectura biométrica devolviendo los datos si el DNI existe y está activo.
+    dni = request.json.get('dni')
+    from db_queries import get_db_connection
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT a.*, e.nombre as empresa_nombre 
+            FROM autorizaciones a
+            LEFT JOIN empresas_contratistas e ON a.id_empresa = e.id
+            WHERE a.dni = ? AND a.tipo_permiso = 'NOMINA' AND a.activo = 1
+        ''', (dni,))
+        row = cursor.fetchone()
+        
+        if row:
+            empleado = dict(row)
+            empleado['puesto_habitual'] = empleado.get('tarea') # En NOMINA, 'tarea' es la categoria/puesto fisico base
+            return jsonify({'success': True, 'empleado': empleado})
+        else:
+            return jsonify({'success': False, 'message': 'Empleado no encontrado o inactivo.'})
+
+@app.route('/api/fichaje/registrar', methods=['POST'])
+def api_fichaje_registrar():
+    # Endpoint para registrar el fichaje real de entrada
+    dni = request.json.get('dni')
+    id_puesto_asignado = request.json.get('id_puesto_asignado')
+    puesto_texto = request.json.get('puesto_texto', '')
+    
+    from db_queries import get_db_connection
+    from datetime import datetime
+    
+    ahora = datetime.now()
+    fecha_hoy = ahora.strftime('%Y-%m-%d')
+    hora_actual = ahora.strftime('%H:%M:%S')
+    
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        # Obtener datos base
+        cursor.execute("SELECT nombre, tarea as categoria FROM autorizaciones WHERE dni=? AND tipo_permiso='NOMINA'", (dni,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({'success': False, 'message': 'DNI no encontrado'})
+        
+        nombre = row['nombre']
+        categoria = row['categoria']
+        
+        cursor.execute('''
+            INSERT INTO registros_fichajes 
+            (fecha, dni, nombre, hora_entrada, estado, categoria, puesto_historico, id_puesto_asignado, puerta)
+            VALUES (?, ?, ?, ?, 'EN CURSO', ?, ?, ?, 'Master')
+        ''', (fecha_hoy, dni, nombre, hora_actual, categoria, puesto_texto, id_puesto_asignado))
+        
+    return jsonify({'success': True})
+
+# === RUTAS DE DEBUG Y DIAGNÓSTICO (ACCESO REMOTO DESDE MULETO) ===
+@app.route('/api/debug/ping', methods=['GET'])
+def api_debug_ping():
+    return jsonify({'success': True, 'status': 'ONLINE', 'time': datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
+
+@app.route('/api/debug/logs', methods=['GET'])
+def api_debug_logs():
+    lines = request.args.get('lines', 50, type=int)
+    log_file = request.args.get('file', 'app.log')
+    from config import BASE_DIR
+    import os
+    
+    file_path = os.path.join(BASE_DIR, 'logs', log_file)
+    if not os.path.exists(file_path):
+        return jsonify({'success': False, 'message': 'Archivo de log no encontrado'})
+        
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.readlines()
+            
+        last_lines = content[-lines:] if len(content) > lines else content
+        return jsonify({
+            'success': True,
+            'file': log_file,
+            'lines_returned': len(last_lines),
+            'logs': last_lines
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+# SINCRO SATELITE
+@app.route('/api/sync/receive_satellite_data', methods=['POST'])
+def api_sync_receive_satellite_data():
+    data = request.json
+    registros = data.get('registros', [])
+    if not registros: return jsonify({'success': True})
+    
+    from db_queries import get_db_connection
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        for r in registros:
+            cursor.execute("""
+                INSERT INTO accesos (timestamp, dni, puerta, estado, tipo_visita)
+                VALUES (?, ?, ?, ?, ?)
+            """, (r['timestamp'], r['dni'], r['puerta'], r['estado'], r.get('tipo_visita', '')))
+        conn.commit()
+    return jsonify({'success': True, 'message': 'Registros guardados en Master'})
 
 if __name__ == '__main__':
-    with app.app_context():
-        cargar_autorizaciones()
-
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
-    time.sleep(1) 
-
-    window = webview.create_window('Control de Acceso', 'http://127.0.0.1:5000', js_api=api)
-    api.set_window(window)
-    webview.start()
+    print("Iniciando aplicación en modo de depuración...")
+    app.run(host='0.0.0.0', port=5050, debug=True)

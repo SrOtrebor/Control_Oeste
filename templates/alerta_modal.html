@@ -1,0 +1,34 @@
+        <!-- MÓDULO DE ALERTAS: CARTEL ROJO Y SONIDO -->
+        <audio id="alertSound" src="https://cdn.pixabay.com/download/audio/2022/03/10/audio_349d95f87b.mp3?filename=alert-33762.mp3" preload="auto"></audio>
+        
+        <div id="modalAlertaSeguridad" class="modal" style="z-index: 9999; background: rgba(255, 0, 0, 0.2);">
+            <div class="modal-content" style="max-width: 600px; border: 4px solid #ff3b30; animation: pulse-border 1.5s infinite;">
+                <div class="modal-header" style="background: #ff3b30; color: white;">
+                    <h2 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                        <span class="material-icons" style="font-size: 2rem;">warning</span>
+                        ¡ALERTA DE SEGURIDAD!
+                    </h2>
+                </div>
+                <div class="modal-body" style="text-align: center; padding: 2rem;">
+                    <h3 id="alertaNombre" style="font-size: 1.8rem; margin-bottom: 0.5rem; text-transform: uppercase;">NOMBRE</h3>
+                    <p id="alertaDNI" style="font-size: 1.2rem; color: var(--dash-text-muted); margin-bottom: 1.5rem;">DNI</p>
+                    
+                    <div style="background: var(--dash-surface-hover); padding: 1rem; border-radius: 8px; margin-bottom: 2rem;">
+                        <p style="margin: 0; font-weight: 500;">Motivo de la Alerta:</p>
+                        <p id="alertaMotivo" style="color: #ff3b30; font-weight: bold; font-size: 1.2rem; margin: 0.5rem 0 0 0;">MOTIVO</p>
+                    </div>
+                    
+                    <button class="dash-btn dash-btn-danger" id="btnEnteradoAlerta" style="width: 100%; font-size: 1.2rem; padding: 1rem;">
+                        <span class="material-icons">check_circle</span> ENTERADO (Cerrar Alerta)
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <style>
+            @keyframes pulse-border {
+                0% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.7); }
+                70% { box-shadow: 0 0 0 20px rgba(255, 59, 48, 0); }
+                100% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0); }
+            }
+        </style>

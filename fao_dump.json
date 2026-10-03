@@ -1,0 +1,218 @@
+{
+  "id": "1265510",
+  "marca": "SIOS SEG INTEG OBR Y SERV SA",
+  "emprendimiento": "30712030077",
+  "idShopping": "61709",
+  "shopping": "Oeste Outlet",
+  "fechaInicio": "2026-09-14T00:00:00",
+  "fechaFin": "2026-10-13T00:00:00",
+  "lugarTrabajo": "Al Oeste Shopping (todo el predio)",
+  "detalleTrabajo": "Se continúa el trabajo de FAO Nº 1256621.\nYa se finalizaron los desmontes. Restan trabajos de montaje y mantenimiento de bombas/valvulas IFCI.\nSe actualiza unicamente la documentación vencida.",
+  "usuario": "30712030077/SIOSSEGINTEGOBRYSERVSAProveedor",
+  "estado": "3",
+  "personal": [
+    {
+      "id": 2626385,
+      "idFormularioPersonal": 6701345,
+      "nombre": "GERARDO RUBEN",
+      "apellido": "BRITOS",
+      "tipoDocumentoSAP": "86",
+      "tipoDocumento": "C.U.I.L.",
+      "numeroDocumento": "20200705530",
+      "nombreART": "Provincia A.R.T. S.A.",
+      "telefonoART": "(011) 4819-2800 ",
+      "activo": true
+    },
+    {
+      "id": 2400467,
+      "idFormularioPersonal": 6701346,
+      "nombre": "RUBEN LUIS",
+      "apellido": "CACERES",
+      "tipoDocumentoSAP": "96",
+      "tipoDocumento": "D.N.I.",
+      "numeroDocumento": "29822811",
+      "nombreART": "PROVINCIA ART S.A.",
+      "telefonoART": "48192800",
+      "activo": true
+    },
+    {
+      "id": 1685165,
+      "idFormularioPersonal": 6701347,
+      "nombre": "JORGE RAFAEL",
+      "apellido": "VIVAS",
+      "tipoDocumentoSAP": "96",
+      "tipoDocumento": "D.N.I.",
+      "numeroDocumento": "33037354",
+      "nombreART": "PROVINCIA ART S.A.",
+      "telefonoART": "48192800",
+      "activo": true
+    },
+    {
+      "id": 2484762,
+      "idFormularioPersonal": 6701349,
+      "nombre": "FREDERICK FRANCOIS",
+      "apellido": "GALVEZ ALVAREZ",
+      "tipoDocumentoSAP": "96",
+      "tipoDocumento": "D.N.I.",
+      "numeroDocumento": "92694649",
+      "nombreART": "PROVINCIA ART S.A.",
+      "telefonoART": "48192800",
+      "activo": true
+    },
+    {
+      "id": 2484773,
+      "idFormularioPersonal": 6701348,
+      "nombre": "ARNY JOSEF",
+      "apellido": "KELLER GODOY",
+      "tipoDocumentoSAP": "96",
+      "tipoDocumento": "D.N.I.",
+      "numeroDocumento": "95630231",
+      "nombreART": "PROVINCIA ART S.A.",
+      "telefonoART": "48192800",
+      "activo": true
+    },
+    {
+      "id": 2688208,
+      "idFormularioPersonal": 6701350,
+      "nombre": "JEAN FRANCO",
+      "apellido": "GIANNOTTA",
+      "tipoDocumentoSAP": "96",
+      "tipoDocumento": "D.N.I.",
+      "numeroDocumento": "41548284",
+      "nombreART": "PROVINCIA ART S.A.",
+      "telefonoART": "48192800",
+      "activo": true
+    },
+    {
+      "id": 2688206,
+      "idFormularioPersonal": 6701352,
+      "nombre": "DYLAN NAHUEL",
+      "apellido": "GLAUS ",
+      "tipoDocumentoSAP": "96",
+      "tipoDocumento": "D.N.I.",
+      "numeroDocumento": "44424596",
+      "nombreART": "PROVINCIA ART S.A.",
+      "telefonoART": "48192800",
+      "activo": true
+    },
+    {
+      "id": 2688210,
+      "idFormularioPersonal": 6701351,
+      "nombre": "DIEGO ALFREDO",
+      "apellido": "PATANIA",
+      "tipoDocumentoSAP": "96",
+      "tipoDocumento": "D.N.I.",
+      "numeroDocumento": "25146765",
+      "nombreART": "PROVINCIA ART S.A.",
+      "telefonoART": "48192800",
+      "activo": true
+    }
+  ],
+  "documentosAdjuntos": [
+    {
+      "id": 9158877,
+      "ruta": "1265510\\202609131230205645051a094e0b3-3644-487c-a20b-1a6f42db5b99.pdf",
+      "nombre": "CERTIFICADO DE COBERTURA(1).pdf"
+    },
+    {
+      "id": 9158878,
+      "ruta": "1265510\\202609131230205801273b2100d01-9eb8-46ca-a682-b12b31855db1.pdf",
+      "nombre": "Nomina Seleccionada(1).pdf"
+    },
+    {
+      "id": 9158879,
+      "ruta": "1265510\\2026091312302058012735d8bbdd0-882f-4b20-b0e2-09ba7c5fcbea.pdf",
+      "nombre": "POLIZAsios RC 2027(1).pdf"
+    },
+    {
+      "id": 9158880,
+      "ruta": "1265510\\20260913123020564505146a27118-d477-426c-b0b5-2fddbac3d6f3.pdf",
+      "nombre": "79626831 - IRSA INVER(1).pdf"
+    },
+    {
+      "id": 9158881,
+      "ruta": "1265510\\202609131230205645051af6d582f-9884-4d57-8364-401c89b12e0e.pdf",
+      "nombre": "DDJJ F931 8-26 SIOS(1).pdf"
+    },
+    {
+      "id": 9158882,
+      "ruta": "1265510\\2026091312302056450513ba5c27c-7279-4ef3-a8d3-51c899ff90ea.pdf",
+      "nombre": "ArcavepSiosseguridadintegoyssaPagodeservicios10-09-2026(1).pdf"
+    }
+  ],
+  "comentarios": [],
+  "tiposTrabajo": [
+    71,
+    71,
+    71,
+    71,
+    71,
+    71,
+    71,
+    71,
+    115,
+    115,
+    115,
+    115,
+    115,
+    115,
+    115,
+    115,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61
+  ],
+  "revisionTIS": false,
+  "fechaVencimientoRevision": "0001-01-01T00:00:00",
+  "avisoOperaciones": false,
+  "ingresoCondicional": false,
+  "requiereControl": false,
+  "horaInicio": "07:00:00",
+  "horaFin": "18:00:00",
+  "rolesFirmantesPendientes": [
+    {
+      "roleId": "ffabb26d-bb29-451a-b705-6b2fed7bddb4",
+      "roleName": "FAO Aprobacion TIS",
+      "loweredRoleName": "fao aprobacion tis"
+    },
+    {
+      "roleId": "4131e5d8-0ee1-44ba-8821-95ff500bb35a",
+      "roleName": "FAO Aprobacion Comercial",
+      "loweredRoleName": "fao aprobacion comercial"
+    },
+    {
+      "roleId": "51a1d611-67c7-4a0b-bb58-be5fbad20b27",
+      "roleName": "FAO Aprobacion MKT",
+      "loweredRoleName": "fao aprobacion mkt"
+    }
+  ],
+  "firmas": [],
+  "isProveedor": true,
+  "acompaniamientoSeguridad": false,
+  "esHorarioNocturno": false,
+  "aprobacionAutomatica": false
+}

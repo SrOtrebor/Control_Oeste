@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Migración a Firestore</title>
+    <style>
+        body { font-family: 'Inter', sans-serif; padding: 2rem; background: #1a1a24; color: white; }
+        .btn { background: #6366f1; color: white; padding: 10px 20px; border: none; cursor: pointer; border-radius: 4px; font-weight: bold; margin-right: 10px; }
+        .btn:hover { background: #4f46e5; }
+        #log { background: #000; padding: 10px; margin-top: 20px; height: 300px; overflow-y: scroll; font-family: monospace; border-radius: 4px; }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+    </style>
+</head>
+<body>
+    <h2>Migración Puente: Python -> Firestore</h2>
+    <p>Esta herramienta extrae las Nóminas y la Lista Negra de tu servidor Python local y las sube de golpe a Firestore.</p>
+    
+    <button class="btn" id="btnMigrarListaNegra">1. Migrar Lista Negra</button>
+    <button class="btn" id="btnMigrarNominas">2. Migrar Nóminas (FAP/FAO)</button>
+    
+    <div id="log">Esperando acción...<br></div>
+
+    <script type="module" src="js/migrate.js"></script>
+</body>
+</html>

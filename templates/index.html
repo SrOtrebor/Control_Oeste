@@ -44,12 +44,15 @@
                     <button id="btnSalida" class="form-button">Salida de Visita</button>
                 </div>
 
-                <hr class="button-separator">
 
-                <!-- Grupo 2: Acciones Manuales -->
+                
+                <hr class="button-separator">
+                
+                <!-- Grupo 3: Biometría (Próximamente) -->
                 <div class="button-group">
-                    <button id="btnFichadorEntrada" class="form-button">Registrar Entrada</button>
-                    <button id="btnFichadorSalida" class="form-button">Registrar Salida</button>
+                    <button id="btnFicharHuella" class="form-button" style="background-color: #6366f1; color: white;">
+                        👆 Fichar con Huella USB
+                    </button>
                 </div>
             </div>
         </div>
@@ -71,7 +74,16 @@
             </div>
 
             <h2>Ingresos del Día</h2>
-            <input type="text" id="searchIngresos" placeholder="Buscar en ingresos..." style="width: 100%; padding: 10px; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 4px;">
+            <div style="display: flex; gap: 10px; margin-bottom: 1rem;">
+                <input type="text" id="searchIngresos" placeholder="Buscar (DNI, Nombre, Empresa)..." style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+                <select id="filterTipo" style="padding: 10px; border: 1px solid #ccc; border-radius: 4px; background-color: white;">
+                    <option value="">Todos los Tipos</option>
+                    <option value="visita">Visitas</option>
+                    <option value="fao">Personal / FAO</option>
+                    <option value="fap">Proveedores / FAP</option>
+                    <option value="excepcion">Excepciones</option>
+                </select>
+            </div>
             <div class="ingresos-list-container">
                 <table class="ingresos-table">
                     <thead>
@@ -96,5 +108,154 @@
 </div>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
+
+<!-- Modal de Fichaje Biométrico -->
+<div id="modalFichaje" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); align-items: center; justify-content: center;">
+    <div style="background-color: var(--card-bg, #1e1e2d); padding: 20px; border-radius: 12px; max-width: 500px; width: 90%; color: white; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+        <h2 style="margin-bottom: 20px; color: #6366f1;">Registro de Personal</h2>
+        
+        <div id="fichajeStep1">
+            <span class="material-icons" style="font-size: 60px; color: #6366f1; margin-bottom: 15px;">fingerprint</span>
+            <p>Esperando lectura biométrica...</p>
+            <p style="font-size: 0.8rem; color: #888;">(Simulación: Presiona escanear)</p>
+            <button id="btnSimularLectura" class="form-button" style="margin-top: 15px; background-color: #6366f1; color: white; width: 100%;">Simular Escáner</button>
+        </div>
+
+        <div id="fichajeStep2" style="display: none;">
+            <img id="fichajeFoto" src="/static/assets/default-avatar.png" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; margin: 0 auto 15px auto; border: 3px solid #6366f1; display: block;">
+            <h3 id="fichajeNombre" style="margin-bottom: 5px;">Nombre Apellido</h3>
+            <p id="fichajeEmpresa" style="color: #aaa; margin-bottom: 20px;">Empresa / Puesto habitual</p>
+            
+            <div style="text-align: left; margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 5px; font-size: 0.9rem; color: #ccc;">Seleccionar Puesto a Cubrir Hoy:</label>
+                <select id="fichajePuestoSelect" style="width: 100%; padding: 10px; border-radius: 6px; background: rgba(0,0,0,0.2); border: 1px solid #444; color: white;">
+                    <option value="">Cargando puestos...</option>
+                </select>
+            </div>
+            
+            <input type="hidden" id="fichajeDni">
+            
+            <div style="display: flex; gap: 10px;">
+                <button id="btnCancelarFichaje" class="form-button" style="background-color: transparent; border: 1px solid #555; color: white; flex: 1;">Cancelar</button>
+                <button id="btnConfirmarFichaje" class="form-button" style="background-color: #10b981; color: white; flex: 1;">Confirmar Ingreso</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const btnFichar = document.getElementById('btnFicharHuella');
+    const modalFichaje = document.getElementById('modalFichaje');
+    const step1 = document.getElementById('fichajeStep1');
+    const step2 = document.getElementById('fichajeStep2');
+    const btnSimular = document.getElementById('btnSimularLectura');
+    const btnCancelar = document.getElementById('btnCancelarFichaje');
+    const btnConfirmar = document.getElementById('btnConfirmarFichaje');
+    const puestoSelect = document.getElementById('fichajePuestoSelect');
+
+    async function cargarPuestosParaFichaje() {
+        try {
+            const res = await fetch('/api/config/puestos_fisicos');
+            const data = await res.json();
+            if (data.success) {
+                puestoSelect.innerHTML = data.data.map(p => `<option value="${p.id}">${p.nombre} (${p.sector})</option>`).join('');
+            }
+        } catch (e) {
+            console.error('Error cargando puestos', e);
+        }
+    }
+
+    if (btnFichar) {
+        btnFichar.addEventListener('click', () => {
+            modalFichaje.style.display = 'flex';
+            step1.style.display = 'block';
+            step2.style.display = 'none';
+            cargarPuestosParaFichaje();
+        });
+    }
+
+    if (btnCancelar) {
+        btnCancelar.addEventListener('click', () => {
+            modalFichaje.style.display = 'none';
+        });
+    }
+
+    if (btnSimular) {
+        btnSimular.addEventListener('click', async () => {
+            // Simulamos que el lector lee una huella y el backend reconoce al empleado.
+            // Para el stub, pedimos un DNI al usuario para "simular" que leimos esa huella.
+            const dniSimulado = prompt("SIMULADOR LECTOR USB: Ingrese el DNI de la huella leida");
+            if (!dniSimulado) return;
+
+            try {
+                const res = await fetch('/api/biometria/identificar', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ dni: dniSimulado })
+                });
+                const data = await res.json();
+                
+                if (data.success && data.empleado) {
+                    const emp = data.empleado;
+                    document.getElementById('fichajeDni').value = emp.dni;
+                    document.getElementById('fichajeNombre').innerText = emp.nombre;
+                    document.getElementById('fichajeEmpresa').innerText = (emp.empresa_nombre || 'Sin empresa') + ' / ' + (emp.tipo_empleado || 'Personal');
+                    
+                    if (emp.foto_path && emp.foto_path.startsWith('data:image')) {
+                        document.getElementById('fichajeFoto').src = emp.foto_path;
+                    } else {
+                        document.getElementById('fichajeFoto').src = '/static/assets/default-avatar.png';
+                    }
+
+                    // Preseleccionar puesto habitual si lo tiene
+                    if (emp.puesto_habitual) {
+                        for(let i=0; i < puestoSelect.options.length; i++) {
+                            if(puestoSelect.options[i].text.includes(emp.puesto_habitual)) {
+                                puestoSelect.selectedIndex = i;
+                                break;
+                            }
+                        }
+                    }
+
+                    step1.style.display = 'none';
+                    step2.style.display = 'block';
+                } else {
+                    alert("Huella no reconocida o empleado inactivo/bloqueado.");
+                }
+            } catch (e) {
+                alert("Error de conexión con el lector.");
+            }
+        });
+    }
+
+    if (btnConfirmar) {
+        btnConfirmar.addEventListener('click', async () => {
+            const dni = document.getElementById('fichajeDni').value;
+            const puesto_id = puestoSelect.value;
+            const puesto_texto = puestoSelect.options[puestoSelect.selectedIndex].text;
+
+            try {
+                const res = await fetch('/api/fichaje/registrar', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ dni: dni, id_puesto_asignado: puesto_id, puesto_texto: puesto_texto })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    alert("✅ Ingreso registrado correctamente");
+                    modalFichaje.style.display = 'none';
+                } else {
+                    alert("Error: " + data.message);
+                }
+            } catch (e) {
+                alert("Error al registrar fichaje.");
+            }
+        });
+    }
+});
+</script>
+
 </body>
 </html>

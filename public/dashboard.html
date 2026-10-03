@@ -1,0 +1,1924 @@
+?<!DOCTYPE html>
+
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Dashboard - Control de Acceso AOS</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <link rel="stylesheet" href="css/dashboard.css">
+
+    <link rel="manifest" href="/manifest.json">
+
+    <script>
+
+        if ('serviceWorker' in navigator) {
+
+            navigator.serviceWorker.register('/service-worker.js');
+
+        }
+
+    </script>
+
+    <script type="module" src="js/dashboard_auth.js"></script>
+
+
+<style>
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+    backdrop-filter: blur(5px);
+}
+.modal.active {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.modal-content {
+    background-color: var(--dash-surface);
+    margin: auto;
+    padding: 2rem;
+    border: 1px solid var(--dash-border);
+    border-radius: var(--dash-radius);
+    max-width: 900px;
+    width: 95%;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+.close-modal {
+    color: var(--dash-text-muted);
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+</style>
+</head>
+
+<body>
+
+    <!-- Header -->
+
+    <header class="dash-header">
+
+        <div class="dash-header-left">
+
+            <h1><span class="material-icons">security</span> Control de Acceso</h1>
+
+            <span class="dash-sede">Al Oeste Shopping</span>
+
+        </div>
+
+        <div class="dash-header-right">
+
+            <div class="dash-live-indicator">
+
+                <span class="live-dot"></span>
+
+                <span id="lastUpdate">--:--:--</span>
+
+            </div>
+
+            <nav class="dash-nav">
+
+                <a href="/admin" class="dash-nav-link"><span class="material-icons">settings</span>Admin</a>
+
+                <a href="/logout" class="dash-nav-link"><span class="material-icons">logout</span>Salir</a>
+
+            </nav>
+
+        </div>
+
+    </header>
+
+
+
+    <main class="dash-main">
+
+        <!-- Stats Cards -->
+
+        <section class="dash-stats">
+
+            <div class="stat-card stat-alerts" id="cardAlertas" onclick="mostrarHistorialAlertas()" style="cursor: pointer; transition: all 0.3s ease;">
+
+                <span class="material-icons stat-icon" style="color: #ff3b30;">warning</span>
+
+                <div class="stat-info">
+
+                    <span class="stat-value" id="statAlertas" style="color: #ff3b30;">0</span>
+
+                    <span class="stat-label" style="color: #ff3b30; font-weight: 600;">Alertas</span>
+
+                </div>
+
+            </div>
+
+            <div class="stat-card stat-inside" onclick="window.filterAndGoTo('adentro')" style="cursor: pointer;">
+
+                <span class="material-icons stat-icon">groups</span>
+
+                <div class="stat-info">
+
+                    <span class="stat-value" id="statAdentro">0</span>
+
+                    <span class="stat-label">Personas adentro</span>
+
+                </div>
+
+            </div>
+
+            <div class="stat-card stat-entries" onclick="window.filterAndGoTo('accesos', 'filterAccesoResultado', 'AUTORIZADO')" style="cursor: pointer;">
+
+                <span class="material-icons stat-icon">login</span>
+
+                <div class="stat-info">
+
+                    <span class="stat-value" id="statEntradas">0</span>
+
+                    <span class="stat-label">Entradas hoy</span>
+
+                </div>
+
+            </div>
+
+            <div class="stat-card stat-exits" onclick="window.filterAndGoTo('accesos')" style="cursor: pointer;">
+
+                <span class="material-icons stat-icon">logout</span>
+
+                <div class="stat-info">
+
+                    <span class="stat-value" id="statSalidas">0</span>
+
+                    <span class="stat-label">Salidas hoy</span>
+
+                </div>
+
+            </div>
+
+            <div class="stat-card stat-denied" onclick="window.filterAndGoTo('accesos', 'filterAccesoResultado', 'DENEGADO')" style="cursor: pointer;">
+
+                <span class="material-icons stat-icon">block</span>
+
+                <div class="stat-info">
+
+                    <span class="stat-value" id="statRechazos">0</span>
+
+                    <span class="stat-label">Rechazos</span>
+
+                </div>
+
+            </div>
+
+            <div class="stat-card stat-visits" onclick="window.filterAndGoTo('accesos')" style="cursor: pointer;">
+
+                <span class="material-icons stat-icon">badge</span>
+
+                <div class="stat-info">
+
+                    <span class="stat-value" id="statVisitas">0</span>
+
+                    <span class="stat-label">Visitas</span>
+
+                </div>
+
+            </div>
+
+            <div class="stat-card stat-fichajes" onclick="window.filterAndGoTo('fichajes')" style="cursor: pointer;">
+
+                <span class="material-icons stat-icon">fingerprint</span>
+
+                <div class="stat-info">
+
+                    <span class="stat-value" id="statFichajes">0</span>
+
+                    <span class="stat-label">Fichajes hoy</span>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- Tab Navigation -->
+
+        <section class="dash-tabs-container">
+
+            <div class="dash-tabs">
+
+                <button class="dash-tab active" data-tab="accesos">
+
+                    <span class="material-icons">login</span> Accesos del día
+
+                </button>
+
+                <button class="dash-tab" data-tab="fichajes">
+
+                    <span class="material-icons">fingerprint</span> Fichajes
+
+                </button>
+
+                <button class="dash-tab" data-tab="adentro">
+
+                    <span class="material-icons">groups</span> Personas adentro
+
+                </button>
+
+                <button class="dash-tab" data-tab="auditoria">
+
+                    <span class="material-icons">search</span> Auditoría
+
+                </button>
+
+                <button class="dash-tab" data-tab="directorio">
+
+                    <span class="material-icons">contact_page</span> Nóminas
+
+                </button>
+
+                <button class="dash-tab" data-tab="tramites">
+
+                    <span class="material-icons">folder_shared</span> FAP/FAO
+
+                </button>
+
+                <button class="dash-tab" data-tab="excepciones">
+
+                    <span class="material-icons">post_add</span> Excepciones
+
+                </button>
+
+                <button class="dash-tab" data-tab="config">
+
+                    <span class="material-icons">settings</span> Configuración
+
+                </button>
+
+                <button class="dash-tab" data-tab="usuarios">
+
+                    <span class="material-icons">manage_accounts</span> Usuarios
+
+                </button>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- Tab: Accesos (General Access Logs) -->
+
+        <section class="dash-panel" id="panel-accesos">
+
+            <div class="panel-header">
+
+                <h2>Accesos del Da</h2>
+
+                <div class="panel-filters">
+
+                    <input type="text" id="filterAccesoDni" placeholder="Buscar DNI o Nombre..." class="dash-input">
+
+                    <select id="filterAccesoResultado" class="dash-select">
+
+                        <option value="">Todos los resultados</option>
+
+                        <option value="AUTORIZADO">Autorizado</option>
+
+                        <option value="DENEGADO">Denegado</option>
+
+                        <option value="REGISTRADO">Registrado</option>
+
+                    </select>
+
+                </div>
+
+            </div>
+
+            <div class="table-wrapper">
+
+                <table class="dash-table" id="tablaAccesos">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>Hora</th>
+
+                            <th>DNI</th>
+
+                            <th>Nombre</th>
+
+                            <th>Evento</th>
+
+                            <th>Permiso</th>
+
+                            <th>Local/Empresa</th>
+
+                            <th>Resultado</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="bodyAccesos">
+
+                        <tr><td colspan="7" class="empty-state">Cargando accesos...</td></tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- Tab: Fichajes -->
+
+        <section class="dash-panel hidden" id="panel-fichajes">
+
+            <div class="panel-header">
+
+                <h2>Fichajes ?? Hoy</h2>
+
+                <div class="panel-filters">
+
+                    <input type="text" id="filterFichajeDni" placeholder="Filtrar por DNI..." class="dash-input">
+
+                </div>
+
+            </div>
+
+            <div class="table-wrapper">
+
+                <table class="dash-table" id="tablaFichajes">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>DNI</th>
+
+                            <th>Nombre</th>
+
+                            <th>Categora</th>
+
+                            <th>Puesto Espec.</th>
+
+                            <th>Entrada</th>
+
+                            <th>Salida</th>
+
+                            <th>Hs Diurnas</th>
+
+                            <th>Hs Nocturnas</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="bodyFichajes">
+
+                        <tr><td colspan="6" class="empty-state">Cargando fichajes...</td></tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- Tab: Personas adentro -->
+
+        <section class="dash-panel hidden" id="panel-adentro">
+
+            <div class="panel-header">
+
+                <h2>Personas dentro del predio ahora</h2>
+
+            </div>
+
+            <div class="personas-grid" id="personasAdentroGrid">
+
+                <p class="empty-state">Cargando...</p>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- Tab: Auditoría -->
+
+        <section class="dash-panel hidden" id="panel-auditoria">
+
+            <div class="panel-header">
+
+                <h2>Auditoría por Perodo</h2>
+
+                <div class="panel-filters audit-filters">
+
+                    <div class="filter-group">
+
+                        <label>Desde</label>
+
+                        <input type="date" id="auditDesde" class="dash-input">
+
+                    </div>
+
+                    <div class="filter-group">
+
+                        <label>Hasta</label>
+
+                        <input type="date" id="auditHasta" class="dash-input">
+
+                    </div>
+
+                    <div class="filter-group">
+
+                        <label>Tipo</label>
+
+                        <select id="auditTipo" class="dash-select">
+
+                            <option value="accesos">Accesos</option>
+
+                            <option value="fichajes">Fichajes</option>
+
+                        </select>
+
+                    </div>
+
+                    <button class="dash-btn dash-btn-primary" id="btnBuscarAudit">
+
+                        <span class="material-icons">search</span> Buscar
+
+                    </button>
+
+                    <button class="dash-btn dash-btn-success" id="btnExportarAudit">
+
+                        <span class="material-icons">download</span> Exportar Excel
+
+                    </button>
+
+                </div>
+
+            </div>
+
+            <div id="auditResultInfo" class="audit-result-info" style="display:none;"></div>
+
+            <div class="table-wrapper">
+
+                <table class="dash-table" id="tablaAuditoria">
+
+                    <thead id="headAuditoria">
+
+                        <tr><th colspan="7" class="empty-state">Seleccion un rango de fechas y hac clic en "Buscar"</th></tr>
+
+                    </thead>
+
+                    <tbody id="bodyAuditoria"></tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- Tab: Directorio / Nóminas -->
+
+        <section class="dash-panel hidden" id="panel-directorio">
+
+            <div class="panel-header">
+
+                <h2>Directorio de Personal Autorizado</h2>
+
+                <div class="panel-filters">
+
+                    <input type="text" id="filterDirectorio" placeholder="Buscar por DNI o Nombre..." class="dash-input">
+
+                    <select id="filterDirectorioTipo" class="dash-select">
+
+                        <option value="TODOS">Todos los tipos</option>
+
+                        <option value="FAO">FAO</option>
+
+                        <option value="FAP">FAP</option>
+
+                        <option value="NOMINA">Nmina</option>
+
+                    </select>
+
+                    <button class="dash-btn dash-btn-outline" style="display:none;">
+
+                        <span class="material-icons">refresh</span> Actualizar
+
+                    </button>
+
+                </div>
+
+            </div>
+
+            <div class="table-wrapper">
+
+                <table class="dash-table" id="tablaDirectorio">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>DNI</th>
+
+                            <th>Nombre</th>
+
+                            <th>Empresa / Local</th>
+
+                            <th>Tipo</th>
+
+                            <th>Nro. Trmite</th>
+
+                            <th>Vence</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="bodyDirectorio">
+
+                        <tr><td colspan="6" class="empty-state">Cargando directorio...</td></tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- Tab: Trmites FAP/FAO -->
+
+        <section class="dash-panel hidden" id="panel-tramites">
+
+            <div class="panel-header">
+
+                <h2>Trmites IRSA ?? FAPs y FAOs</h2>
+
+                <div class="panel-filters">
+
+                    <input type="text" id="filterTramites" placeholder="Buscar por empresa o ID..." class="dash-input">
+
+                    <select id="filterTramiteTipo" class="dash-select" style="display:none;">
+
+                        <option value="">Todos</option>
+
+                        <option value="FAO">Solo FAO</option>
+
+                        <option value="FAP">Solo FAP</option>
+
+                    </select>
+
+                    <select id="filterTramitesEstado" class="dash-select">
+
+                        <option value="TODOS">Todos los estados</option>
+
+                        <option value="6">Aprobado</option>
+
+                        <option value="4">Aprobado Parcial</option>
+
+                        <option value="3">Enviado</option>
+
+                        <option value="5">Requiere Cambios</option>
+
+                    </select>
+
+                    <button class="dash-btn dash-btn-outline" onclick="loadTramitesIRSA()">
+
+                        <span class="material-icons">refresh</span> Actualizar
+
+                    </button>
+
+                </div>
+
+            </div>
+
+            <div class="table-wrapper">
+
+                <table class="dash-table" id="tablaTramites">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>Tipo</th>
+
+                            <th>ID</th>
+
+                            <th>Empresa</th>
+
+                            <th>Fecha Inicio</th>
+
+                            <th>Fecha Fin</th>
+
+                            <th>Estado</th>
+
+                            <th>Detalle</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="bodyTramites">
+
+                        <tr><td colspan="7" class="empty-state">Cargando trmites...</td></tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- Tab: Excepciones -->
+
+        <section class="dash-panel hidden" id="panel-excepciones">
+
+            <div class="panel-header">
+
+                <h2>Cargar Excepciones o Nóminas Especiales</h2>
+
+            </div>
+
+            <div class="config-content" style="padding: 2rem;">
+
+                <div class="config-card" style="background: var(--dash-surface-hover); padding: 1.5rem; border-radius: var(--dash-radius); border: 1px solid var(--dash-border);">
+
+                    <h3 style="margin-bottom: 1rem; color: var(--dash-primary); display: flex; align-items: center; gap: 0.5rem;">
+
+                        <span class="material-icons">assignment</span> Parseador de Excepciones (Texto Libre)
+
+                    </h3>
+
+                    <p style="color: var(--dash-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+
+                        Pegue aqu el texto copiado desde un correo electrnico, WhatsApp o PDF. El sistema extraer inteligentemente los DNI y nombres (formatos soportados: CUIL Nombre, DNI Nombre, etc.).
+
+                    </p>
+
+                    
+
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+
+                        <div style="flex: 1; min-width: 200px;">
+
+                            <label style="display: block; margin-bottom: 0.5rem; color: var(--dash-text);">Motivo o Empresa</label>
+
+                            <input type="text" id="nominaEmpresa" class="dash-input" placeholder="Ej: Visita tcnica ASSA / Excepcin por urgencia">
+
+                        </div>
+
+                        <div style="flex: 1; min-width: 150px;">
+
+                            <label style="display: block; margin-bottom: 0.5rem; color: var(--dash-text);">Vigencia Desde</label>
+
+                            <input type="date" id="nominaVigenciaDesde" class="dash-input">
+
+                        </div>
+
+                        <div style="flex: 1; min-width: 150px;">
+
+                            <label style="display: block; margin-bottom: 0.5rem; color: var(--dash-text);">Vigencia Hasta</label>
+
+                            <input type="date" id="nominaVigenciaHasta" class="dash-input">
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div style="margin-bottom: 1rem;">
+
+                        <label style="display: block; margin-bottom: 0.5rem; color: var(--dash-text);">Listado de Personas</label>
+
+                        <textarea id="nominaTexto" rows="10" placeholder="Ejemplo:&#10;20-34049323-1 ALBRESPY MUZZUPAPPA CARLOS&#10;20446113047 1 BARATAY ORTIZ FACUNDO JAVIER" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid var(--dash-border); background: var(--dash-surface); color: var(--dash-text); font-family: monospace; resize: vertical;"></textarea>
+
+                    </div>
+
+
+
+                    <div style="display: flex; gap: 1rem; align-items: center;">
+
+                        <button id="btnPreviewNomina" class="dash-btn dash-btn-outline">
+
+                            <span class="material-icons">visibility</span> Previsualizar
+
+                        </button>
+
+                        <p id="nominaParseStatus" style="font-size: 0.85rem; font-weight: 500;"></p>
+
+                    </div>
+
+
+
+                    <!-- Tabla de previsualizacin -->
+
+                    <div id="previewNominaContainer" style="display: none; margin-top: 2rem;">
+
+                        <h4 style="margin-bottom: 1rem; color: var(--dash-text);">Previsualizacin (Editable)</h4>
+
+                        <div style="background: var(--dash-bg); border-radius: var(--dash-radius-sm); border: 1px solid var(--dash-border); overflow-x: auto; margin-bottom: 1rem;">
+
+                            <table class="dash-table" style="width: 100%;">
+
+                                <thead>
+
+                                    <tr>
+
+                                        <th>DNI</th>
+
+                                        <th>Apellido</th>
+
+                                        <th>Nombre</th>
+
+                                        <th>Accin</th>
+
+                                    </tr>
+
+                                </thead>
+
+                                <tbody id="previewNominaBody"></tbody>
+
+                            </table>
+
+                        </div>
+
+                        
+
+                        <div style="display: flex; gap: 1rem; align-items: center;">
+
+                            <button id="btnSaveNomina" class="dash-btn dash-btn-primary">
+
+                                <span class="material-icons">save</span> Guardar y Aprobar Excepcin
+
+                            </button>
+
+                            <p id="nominaSaveStatus" style="font-size: 0.85rem; font-weight: 500;"></p>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+        <!-- Tab: Configuración -->
+
+        <section class="dash-panel hidden" id="panel-config" style="flex: none; min-height: auto; overflow: visible;">
+
+            <div class="panel-header" style="flex-shrink: 0;">
+
+                <h2>Configuración del Sistema</h2>
+
+            </div>
+
+            <div class="config-content" style="padding: 2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start;">
+
+                
+
+                <!-- Columna Izquierda -->
+
+                <div style="display: flex; flex-direction: column; gap: 2rem;">
+
+                    <!-- Sincronizacion IRSA -->
+
+                    <div class="config-card" style="background: var(--dash-surface-hover); padding: 1.5rem; border-radius: var(--dash-radius); border: 1px solid var(--dash-border);">
+
+                        <h3 style="margin-bottom: 1rem; color: var(--dash-primary); display: flex; align-items: center; gap: 0.5rem;">
+
+                            <span class="material-icons">cloud_sync</span> Sincronizacin IRSA (FAOs y FAPs)
+
+                        </h3>
+
+                        <p style="font-size: 0.85rem; color: var(--dash-text-muted); margin-bottom: 1.5rem;">
+
+                            El sistema se conecta automticamente cada 4 horas. Para que esto funcione, debe ingresar las credenciales del portal Locatarios de IRSA.
+
+                        </p>
+
+                        
+
+                        <div style="display: flex; flex-direction: column; gap: 1rem;">
+
+                            <div class="filter-group">
+
+                                <label>Usuario IRSA</label>
+
+                                <input type="text" id="irsaUser" class="dash-input" placeholder="ej: supervisor_oeste">
+
+                            </div>
+
+                            <div class="filter-group">
+
+                                <label>Contrasea IRSA</label>
+
+                                <input type="password" id="irsaPass" class="dash-input" placeholder="Ingresar solo si desea actualizarla">
+
+                            </div>
+
+                            <div class="filter-group">
+
+                                <label>Das de Alerta Previa al Vencimiento</label>
+
+                                <input type="number" id="irsaDiasAlerta" class="dash-input" placeholder="Ej: 5" value="0">
+
+                            </div>
+
+                            
+
+                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--dash-border); padding-bottom: 0.5rem;">
+
+                                <span>Estado Credenciales:</span>
+
+                                <span id="irsaHasCreds" style="font-weight: 600;">Comprobando...</span>
+
+                            </div>
+
+                            <div style="display: flex; justify-content: space-between; padding-top: 0.5rem;">
+
+                                <span>?ltima Sincronizacin:</span>
+
+                                <span id="irsaLastSyncTime" style="font-weight: 600;">...</span>
+
+                            </div>
+
+                        </div>
+
+                        <div style="display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap;">
+
+                            <button id="btnSaveIrsa" class="dash-btn dash-btn-primary" style="flex: 1; min-width: 200px;"><span class="material-icons">save</span> Guardar Credenciales</button>
+
+                            <!-- Boton IoT -->
+
+                            <button id="btnTriggerIrsa" class="dash-btn dash-btn-outline" style="flex: 1; min-width: 200px;"><span class="material-icons">sync</span> Extraer Nóminas IRSA Ahora</button>
+
+                            <button id="btnTriggerOta" class="dash-btn dash-btn-outline" style="flex: 1; min-width: 200px;"><span class="material-icons">system_update_alt</span> Actualizar Garita (OTA)</button>
+
+                        </div>
+
+                        <p id="workerStatusMsg" style="font-size: 0.85rem; margin-top: 1rem; font-weight: bold; text-align: center; color: var(--dash-text-muted);"></p>
+
+                        <p id="irsaStatusMsg" style="font-size: 0.85rem; margin-top: 1rem; display: none; font-weight: 500; text-align: center;"></p>
+
+                    </div>
+
+                    
+
+                    <!-- Caja Anti-Bloqueos IRSA (Bypass) -->
+
+                    <div class="config-card" style="background: var(--dash-surface-hover); padding: 1.5rem; border-radius: var(--dash-radius); border: 1px solid var(--dash-border); margin-bottom: 2rem; border-left: 4px solid var(--dash-primary);">
+
+                        <h3 style="margin-bottom: 0.5rem; color: var(--dash-primary); display: flex; align-items: center; gap: 0.5rem;">
+
+                            <span class="material-icons">security_update_warning</span> Anti-Bloqueo de Permisos IRSA
+
+                        </h3>
+
+                        <p style="color: var(--dash-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Si IRSA no reporta automticamente un trmite (como los que estn en proceso de firma), pods forzar la descarga manual escribiendo el ID.</p>
+
+                        
+
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+
+                            <input type="text" id="manualFaoInput" placeholder="N° de Trmite (ej: 1266421)" style="flex: 1; padding: 10px; border-radius: 4px; border: 1px solid var(--dash-border); background: var(--dash-surface); color: var(--dash-text);">
+
+                            <button id="btnManualSync" class="dash-btn dash-btn-primary" style="padding: 10px 20px;">
+
+                                <span class="material-icons">download</span> Descarga Forzada
+
+                            </button>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- ABM Puestos Fisicos -->
+
+                    <div class="config-card" style="background: var(--dash-surface-hover); padding: 1.5rem; border-radius: var(--dash-radius); border: 1px solid var(--dash-border);">
+
+                        <h3 style="margin-bottom: 1rem; color: var(--dash-primary); display: flex; align-items: center; gap: 0.5rem;">
+
+                            <span class="material-icons">place</span> Puestos Fsicos (Para Fichaje)
+
+                        </h3>
+
+                        <p style="color: var(--dash-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Cree los puestos (ej. Garita 1) para asignarle al personal al momento de fichar.</p>
+
+                        
+
+                        <form id="formPuestosFisicos" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem;">
+
+                            <input type="text" id="nuevoPuestoFisicoNombre" class="dash-input" placeholder="Nombre (Ej: Garita 1)" required>
+
+                            <select id="nuevoPuestoFisicoSector" class="dash-select" required>
+
+                                <option value="">Seleccionar Sector...</option>
+
+                                <option value="Mall">Mall</option>
+
+                                <option value="Cocheras">Cocheras</option>
+
+                                <option value="Eventos">Eventos</option>
+
+                            </select>
+
+                            <div style="display: flex; gap: 0.5rem;">
+
+                                <input type="time" id="nuevoPuestoFisicoInicio" class="dash-input" title="Hora Inicio">
+
+                                <input type="time" id="nuevoPuestoFisicoFin" class="dash-input" title="Hora Fin">
+
+                            </div>
+
+                            <button type="submit" class="dash-btn dash-btn-primary"><span class="material-icons">add</span> Agregar Puesto</button>
+
+                        </form>
+
+                        
+
+                        <div style="background: var(--dash-bg); border-radius: var(--dash-radius-sm); border: 1px solid var(--dash-border); padding: 1rem; max-height: 250px; overflow-y: auto;">
+
+                            <ul id="listaPuestosFisicos" style="list-style: none; display: flex; flex-direction: column; gap: 0.5rem;">
+
+                                <li style="color: var(--dash-text-muted); text-align: center; font-size: 0.85rem;">Cargando...</li>
+
+                            </ul>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- Columna Derecha -->
+
+                <div style="display: flex; flex-direction: column; gap: 2rem;">
+
+                    <!-- ABM Empresas -->
+
+                    <div class="config-card" style="background: var(--dash-surface-hover); padding: 1.5rem; border-radius: var(--dash-radius); border: 1px solid var(--dash-border);">
+
+                        <h3 style="margin-bottom: 1rem; color: var(--dash-primary); display: flex; align-items: center; gap: 0.5rem;">
+
+                            <span class="material-icons">business</span> Empresas Contratistas
+
+                        </h3>
+
+                        <p style="color: var(--dash-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Administre las empresas proveedoras de servicios tercerizados.</p>
+
+                        
+
+                        <form id="formEmpresas" style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
+
+                            <input type="text" id="nuevaEmpresaNombre" class="dash-input" placeholder="Nombre de Empresa..." required style="flex-grow: 1;">
+
+                            <button type="submit" class="dash-btn dash-btn-primary"><span class="material-icons">add</span> Agregar</button>
+
+                        </form>
+
+                        
+
+                        <div style="background: var(--dash-bg); border-radius: var(--dash-radius-sm); border: 1px solid var(--dash-border); padding: 1rem; max-height: 250px; overflow-y: auto;">
+
+                            <ul id="listaEmpresas" style="list-style: none; display: flex; flex-direction: column; gap: 0.5rem;">
+
+                                <li style="color: var(--dash-text-muted); text-align: center; font-size: 0.85rem;">Cargando...</li>
+
+                            </ul>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Lista Negra -->
+
+                    <div class="config-card" style="background: var(--dash-surface-hover); padding: 1.5rem; border-radius: var(--dash-radius); border: 1px solid #ff3b30;">
+
+                        <h3 style="margin-bottom: 1rem; color: #ff3b30; display: flex; align-items: center; gap: 0.5rem;">
+
+                            <span class="material-icons">gavel</span> Lista Negra (Personas de Inters)
+
+                        </h3>
+
+                        <form id="formListaNegra" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem;">
+
+                            <input type="text" id="lnDni" class="dash-input" placeholder="DNI exacto..." required>
+
+                            <input type="text" id="lnMotivo" class="dash-input" placeholder="Motivo o antecedente..." required>
+
+                            <button type="submit" class="dash-btn" style="background: #ff3b30; color: white; border: none;"><span class="material-icons">add_circle</span> Bloquear Persona</button>
+
+                        </form>
+
+                        <div style="background: var(--dash-bg); border-radius: var(--dash-radius-sm); border: 1px solid var(--dash-border); padding: 1rem;">
+
+                            <ul id="ulListaNegra" style="list-style: none; display: flex; flex-direction: column; gap: 0.5rem;"></ul>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Respaldo de Base de Datos -->
+
+                    <div class="config-card" style="background: var(--dash-surface-hover); padding: 1.5rem; border-radius: var(--dash-radius); border: 1px solid var(--dash-border);">
+
+                        <h3 style="margin-bottom: 1rem; color: var(--dash-primary); display: flex; align-items: center; gap: 0.5rem;">
+
+                            <span class="material-icons">save</span> Respaldo de Base de Datos
+
+                        </h3>
+
+                        <p style="color: var(--dash-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Generar y descargar una copia de seguridad local.</p>
+
+                        <button class="dash-btn dash-btn-primary" onclick="descargarBackup()" style="width: 100%;">
+
+                            <span class="material-icons">download</span> Descargar Backup Completo
+
+                        </button>
+
+                        <p id="backupStatusMsg" style="font-size: 0.85rem; margin-top: 1rem; display: none; font-weight: 500;"></p>
+
+                    </div>
+
+                </div>
+                    <!-- ABM Personal (Ex Nómina Form) -->
+                    <div class="config-card" id="configCardNomina" style="grid-column: 1 / -1; background: var(--dash-surface-hover); padding: 1.5rem; border-radius: var(--dash-radius); border: 1px solid var(--dash-border);">
+                        <h3 style="margin-bottom: 1rem; color: var(--dash-primary); display: flex; align-items: center; gap: 0.5rem;">
+                            <span class="material-icons">badge</span> Agregar / Editar Personal Autorizado
+                        </h3>
+                        <form id="formNomina">
+
+                <input type="hidden" id="nominaId">
+
+                
+
+                <div class="abm-columns">
+
+                    <!-- Columna 1: Datos Personales -->
+
+                    <div class="abm-column">
+
+                        <h3 class="abm-section-title"><span class="material-icons">badge</span> Datos Personales</h3>
+
+                        
+
+                        <div class="filter-group mb-3">
+
+                            <label>DNI</label>
+
+                            <input type="text" id="nominaDni" class="dash-input" required placeholder="Sin puntos ni espacios">
+
+                        </div>
+
+                        
+
+                        <div class="filter-group mb-3">
+
+                            <label>Nombre y Apellido</label>
+
+                            <input type="text" id="nominaNombre" class="dash-input" required>
+
+                        </div>
+
+                        
+
+                        <div class="filter-group mb-3">
+
+                            <label>Empresa Contratista</label>
+
+                            <select id="nominaEmpresa" class="dash-select" required>
+
+                                <option value="">Cargando Empresas...</option>
+
+                            </select>
+
+                        </div>
+
+
+
+                        <div class="filter-group mb-3">
+
+                            <label>Tipo de Empleado</label>
+
+                            <select id="nominaTipoEmpleado" class="dash-select" required>
+
+                                <option value="">Seleccionar Tipo...</option>
+
+                                <option value="Seguridad">Seguridad</option>
+
+                                <option value="Limpieza">Limpieza</option>
+
+                                <option value="Mantenimiento">Mantenimiento</option>
+
+                                <option value="Administracin">Administracin</option>
+
+                                <option value="Otro">Otro</option>
+
+                            </select>
+
+                        </div>
+
+                        
+
+                        <div class="filter-group mb-3">
+
+                            <label>Puesto Fsico (Por Defecto)</label>
+
+                            <select id="nominaPuestoFisico" class="dash-select">
+
+                                <option value="">Cargando Puestos...</option>
+
+                            </select>
+
+                            <small class="dash-text-muted">Puesto habitual. Podr cambiarse en vivo al fichar.</small>
+
+                        </div>
+
+                        
+
+                        <div class="filter-group mb-3">
+
+                            <label>Estado</label>
+
+                            <select id="nominaActivo" class="dash-select">
+
+                                <option value="1">Activo (Permitir Ingreso)</option>
+
+                                <option value="0">Bloqueado (No Permitir)</option>
+
+                            </select>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Columna 2: Foto y Biometra -->
+
+                    <div class="abm-column bio-column">
+
+                        <h3 class="abm-section-title"><span class="material-icons">camera_alt</span> Fotografa</h3>
+
+                        <div class="photo-container mb-3" style="text-align: center;">
+
+                            <video id="webcamVideo" autoplay playsinline style="display:none; width: 100%; border-radius: var(--dash-radius); border: 1px solid var(--dash-border);"></video>
+
+                            <canvas id="photoCanvas" style="display:none;"></canvas>
+
+                            <img id="nominaFotoPreview" src="/static/assets/default-avatar.png" alt="Foto Empleado" style="max-width: 150px; border-radius: var(--dash-radius); border: 2px solid var(--dash-border); margin-bottom: 1rem;">
+
+                            
+
+                            <div style="display: flex; gap: 0.5rem; justify-content: center;">
+
+                                <label class="dash-btn dash-btn-outline" style="cursor: pointer;">
+
+                                    <span class="material-icons">upload_file</span> Subir
+
+                                    <input type="file" id="nominaFotoUpload" accept="image/*" style="display:none;">
+
+                                </label>
+
+                                <button type="button" class="dash-btn dash-btn-secondary" id="btnActivarCamara"><span class="material-icons">photo_camera</span> Cmara</button>
+
+                                <button type="button" class="dash-btn dash-btn-primary" id="btnTomarFoto" style="display:none;"><span class="material-icons">camera</span> Capturar</button>
+
+                            </div>
+
+                            <input type="hidden" id="nominaFotoB64">
+
+                        </div>
+
+
+
+                        <h3 class="abm-section-title"><span class="material-icons">fingerprint</span> Biometra SecuGen</h3>
+
+                        
+
+                        <div class="bio-status-card">
+
+                            <div class="bio-icon-container">
+
+                                <span class="material-icons bio-icon" id="bioStatusIcon">fingerprint</span>
+
+                            </div>
+
+                            <h4 id="bioStatusTitle">Sin huella registrada</h4>
+
+                            <p id="bioStatusDesc" class="dash-text-muted">Conecte el lector SecuGen Hamster Plus y presione capturar.</p>
+
+                        </div>
+
+
+
+                        <button type="button" class="dash-btn dash-btn-secondary bio-btn" id="btnCapturarHuella">
+
+                            <span class="material-icons">scanner</span> Capturar Huella
+
+                        </button>
+
+                        
+
+                        <input type="hidden" id="nominaHuellaTemplate" value="">
+
+                    </div>
+
+                </div>
+
+                
+
+                <div class="abm-actions">
+
+                    <button type="button" class="dash-btn dash-btn-outline" id="btnCancelarNomina">Cancelar</button>
+
+                    <button type="submit" class="dash-btn dash-btn-primary">Guardar Empleado</button>
+
+                </div>
+
+            </form>
+                    </div>
+
+
+
+
+            </div>
+
+        </section>
+
+        </section>
+
+
+
+        <!-- Tab: Usuarios (Crear Usuarios) -->
+
+        <section class="dash-panel hidden" id="panel-usuarios" style="overflow-y: auto;">
+
+            <div class="panel-header">
+
+                <h2>Gestin de Usuarios</h2>
+
+            </div>
+
+            <div class="panel-content" style="max-width: 500px; padding: 20px; background: var(--card-bg); border-radius: 8px;">
+
+                <p>Crear cuentas para los guardias de seguridad.</p>
+
+                
+
+                <div style="margin-top: 15px;">
+
+                    <label style="display:block; margin-bottom:5px;">Correo Electrnico:</label>
+
+                    <input type="email" id="newUserEmail" class="dash-input" placeholder="garita1@oeste.com" style="width:100%; margin-bottom: 15px;">
+
+                    
+
+                    <label style="display:block; margin-bottom:5px;">Contrasea:</label>
+
+                    <input type="password" id="newUserPassword" class="dash-input" placeholder="Mnimo 6 caracteres" style="width:100%; margin-bottom: 15px;">
+
+                    
+
+                    <label style="display:block; margin-bottom:5px;">Rol Asignado:</label>
+
+                    <select id="newUserRole" class="dash-select" style="width:100%; margin-bottom: 20px;">
+
+                        <option value="acceso_principal">Garita Principal (Puede Fichar)</option>
+
+                        <option value="acceso_satelite">Garita Satlite (Solo lectura)</option>
+
+                        <option value="supervisor">Supervisor (Acceso al Dashboard)</option>
+
+                        <option value="super_admin">Super Administrador</option>
+
+                    </select>
+
+
+
+                    <button class="dash-btn dash-btn-primary" onclick="window.crearNuevoUsuario()" style="width: 100%;">Crear Usuario</button>
+
+                    <p id="msgCrearUsuario" style="margin-top: 15px; font-weight: bold;"></p>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+<style>
+
+/* Estilos Premium para el ABM Modal */
+
+.abm-modal-content {
+
+    max-width: 900px;
+
+    width: 95%;
+
+}
+
+
+
+.abm-columns {
+
+    display: grid;
+
+    grid-template-columns: 1fr 1fr;
+
+    gap: 2rem;
+
+    margin-bottom: 2rem;
+
+}
+
+
+
+.mb-3 {
+
+    margin-bottom: 1.25rem;
+
+}
+
+
+
+.abm-section-title {
+
+    font-size: 1.1rem;
+
+    font-weight: 600;
+
+    margin-bottom: 1.5rem;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 0.5rem;
+
+    color: var(--dash-primary);
+
+    border-bottom: 1px solid var(--dash-border);
+
+    padding-bottom: 0.5rem;
+
+}
+
+
+
+/* Biometra Card */
+
+.bio-column {
+
+    display: flex;
+
+    flex-direction: column;
+
+}
+
+
+
+.bio-status-card {
+
+    background: var(--dash-surface-hover);
+
+    border: 1px dashed var(--dash-border);
+
+    border-radius: var(--dash-radius);
+
+    padding: 1.5rem;
+
+    text-align: center;
+
+    margin-bottom: 1rem;
+
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+
+    justify-content: center;
+
+    transition: var(--dash-transition);
+
+}
+
+
+
+.bio-status-card.success {
+
+    border-color: var(--dash-success);
+
+    background: var(--dash-success-glow);
+
+}
+
+
+
+.bio-icon-container {
+
+    width: 60px;
+
+    height: 60px;
+
+    border-radius: 50%;
+
+    background: rgba(255,255,255,0.05);
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    margin-bottom: 0.5rem;
+
+}
+
+
+
+.bio-icon {
+
+    font-size: 2.5rem;
+
+    color: var(--dash-text-muted);
+
+}
+
+
+
+.bio-status-card.success .bio-icon {
+
+    color: var(--dash-success);
+
+}
+
+
+
+.bio-btn {
+
+    width: 100%;
+
+    display: flex;
+
+    justify-content: center;
+
+    align-items: center;
+
+    gap: 0.5rem;
+
+    font-size: 1.1rem;
+
+    padding: 0.75rem;
+
+}
+
+
+
+.abm-actions {
+
+    display: flex;
+
+    justify-content: flex-end;
+
+    gap: 1rem;
+
+    border-top: 1px solid var(--dash-border);
+
+    padding-top: 1.5rem;
+
+}
+
+
+
+.dash-text-muted {
+
+    color: var(--dash-text-muted);
+
+    font-size: 0.85rem;
+
+    margin-top: 0.25rem;
+
+    display: block;
+
+}
+
+</style>
+
+
+
+
+
+    <script type="module" src="js/dashboard.js"></script>
+
+    <script type="module">
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+
+        import { getAuth, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+
+        import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+        
+
+        const firebaseConfig = {
+
+            apiKey: "AIzaSyBg0ht9KWgGrhGmHkT7mzCRgJ2CS6e4-lQ",
+
+            authDomain: "control-acceso-c2f82.firebaseapp.com",
+
+            projectId: "control-acceso-c2f82",
+
+            storageBucket: "control-acceso-c2f82.firebasestorage.app",
+
+            messagingSenderId: "654089830879",
+
+            appId: "1:654089830879:web:96b5a40c8fc6292422446a"
+
+        };
+
+        
+
+        // Inicializar app principal para base de datos
+
+        const dbApp = initializeApp(firebaseConfig, "dbApp");
+
+        const db = getFirestore(dbApp);
+
+        
+
+        // Inicializar app secundaria para evitar desloguear al Super Admin
+
+        const secondaryApp = initializeApp(firebaseConfig, "Secondary");
+
+        const secondaryAuth = getAuth(secondaryApp);
+
+
+
+        window.crearNuevoUsuario = async function() {
+
+            const email = document.getElementById('newUserEmail').value;
+
+            const password = document.getElementById('newUserPassword').value;
+
+            const rol = document.getElementById('newUserRole').value;
+
+            const msgEl = document.getElementById('msgCrearUsuario');
+
+            
+
+            if(!email || !password || !rol) {
+
+                msgEl.style.color = '#ff3b30';
+
+                msgEl.textContent = 'Por favor complete todos los campos.';
+
+                return;
+
+            }
+
+            if(password.length < 6) {
+
+                msgEl.style.color = '#ff3b30';
+
+                msgEl.textContent = 'La contrasea debe tener al menos 6 caracteres.';
+
+                return;
+
+            }
+
+            
+
+            msgEl.style.color = '#007aff';
+
+            msgEl.textContent = 'Creando usuario directamente en la nube...';
+
+            
+
+            try {
+
+                // Crear usuario en Auth Secundario
+
+                const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+
+                const newUid = userCredential.user.uid;
+
+                
+
+                // Cerrar la sesin secundaria al instante
+
+                await signOut(secondaryAuth);
+
+                
+
+                // Guardar el rol en Firestore usando la app principal
+
+                await setDoc(doc(db, "usuarios", newUid), {
+
+                    email: email,
+
+                    rol: rol,
+
+                    activo: true,
+
+                    centro_id: 'al_oeste'
+
+                });
+
+                
+
+                msgEl.style.color = '#34c759';
+
+                msgEl.textContent = '¡Usuario creado exitosamente desde la nube!';
+
+                document.getElementById('newUserEmail').value = '';
+
+                document.getElementById('newUserPassword').value = '';
+
+                
+
+            } catch(e) {
+
+                msgEl.style.color = '#ff3b30';
+
+                console.error(e);
+
+                if (e.code === 'auth/email-already-in-use') {
+
+                    msgEl.textContent = 'Error: El correo ya est en uso.';
+
+                } else {
+
+                    msgEl.textContent = 'Error: ' + e.message;
+
+                }
+
+            }
+
+        };
+
+    </script>
+
+<!-- Modal: ABM Personal (Ex Nmina Form) -->
+
+
+
+
+
+<style>
+
+/* Estilos Premium para el ABM Modal */
+
+.abm-modal-content {
+
+    max-width: 900px;
+
+    width: 95%;
+
+}
+
+
+
+.abm-columns {
+
+    display: grid;
+
+    grid-template-columns: 1fr 1fr;
+
+    gap: 2rem;
+
+    margin-bottom: 2rem;
+
+}
+
+
+
+.mb-3 {
+
+    margin-bottom: 1.25rem;
+
+}
+
+
+
+.abm-section-title {
+
+    font-size: 1.1rem;
+
+    font-weight: 600;
+
+    margin-bottom: 1.5rem;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 0.5rem;
+
+    color: var(--dash-primary);
+
+    border-bottom: 1px solid var(--dash-border);
+
+    padding-bottom: 0.5rem;
+
+}
+
+
+
+/* Biometra Card */
+
+.bio-column {
+
+    display: flex;
+
+    flex-direction: column;
+
+}
+
+
+
+.bio-status-card {
+
+    background: var(--dash-surface-hover);
+
+    border: 1px dashed var(--dash-border);
+
+    border-radius: var(--dash-radius);
+
+    padding: 1.5rem;
+
+    text-align: center;
+
+    margin-bottom: 1rem;
+
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+
+    justify-content: center;
+
+    transition: var(--dash-transition);
+
+}
+
+
+
+.bio-status-card.success {
+
+    border-color: var(--dash-success);
+
+    background: var(--dash-success-glow);
+
+}
+
+
+
+.bio-icon-container {
+
+    width: 60px;
+
+    height: 60px;
+
+    border-radius: 50%;
+
+    background: rgba(255,255,255,0.05);
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    margin-bottom: 0.5rem;
+
+}
+
+
+
+.bio-icon {
+
+    font-size: 2.5rem;
+
+    color: var(--dash-text-muted);
+
+}
+
+
+
+.bio-status-card.success .bio-icon {
+
+    color: var(--dash-success);
+
+}
+
+
+
+.bio-btn {
+
+    width: 100%;
+
+    display: flex;
+
+    justify-content: center;
+
+    align-items: center;
+
+    gap: 0.5rem;
+
+    font-size: 1.1rem;
+
+    padding: 0.75rem;
+
+}
+
+
+
+.abm-actions {
+
+    display: flex;
+
+    justify-content: flex-end;
+
+    gap: 1rem;
+
+    border-top: 1px solid var(--dash-border);
+
+    padding-top: 1.5rem;
+
+}
+
+
+
+.dash-text-muted {
+
+    color: var(--dash-text-muted);
+
+    font-size: 0.85rem;
+
+    margin-top: 0.25rem;
+
+    display: block;
+
+}
+
+</style>
+
+
+
+<script type="module" src="/js/nomina_logic_snippet.js"></script>
+
+</body>
+
+</html>
+

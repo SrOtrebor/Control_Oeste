@@ -86,23 +86,25 @@ class TestAPIEndpoints:
     
     def test_get_ingresos_diarios(self, client):
         """Test obtener ingresos diarios"""
-        response = client.get('/get_ingresos_diarios')
+        response = client.get('/get_daily_records')
         
         assert response.status_code == 200
         data = response.get_json()
         
-        # Debería retornar una lista
-        assert isinstance(data, list)
+        # Debería retornar diccionario con clave records
+        assert isinstance(data, dict)
+        assert 'records' in data
     
     def test_get_stats(self, client):
         """Test obtener estadísticas"""
-        response = client.get('/get_stats')
+        response = client.get('/get_dynamic_stats')
         
         assert response.status_code == 200
         data = response.get_json()
         
         # Debería retornar un diccionario con stats
         assert isinstance(data, dict)
+        assert 'total_adentro' in data
 
 
 class TestLogin:
@@ -110,13 +112,15 @@ class TestLogin:
     
     def test_login_con_credenciales_invalidas(self, client):
         """Test login con credenciales incorrectas"""
-        response = client.post('/login', data={
+        response = client.post('/perform_login', json={
             'username': 'usuario_invalido',
             'password': 'password_invalido'
-        }, follow_redirects=False)
+        })
         
         # Debería rechazar el login
-        assert response.status_code in [200, 302]
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data.get('success') is False
     
     def test_logout(self, client):
         """Test logout"""
@@ -131,14 +135,14 @@ class TestReportes:
     
     def test_descargar_reporte_sin_autenticacion(self, client):
         """Test descargar reporte sin autenticación"""
-        response = client.get('/descargar_reporte')
+        response = client.get('/descargar_reporte_diario')
         
         # Debería denegar acceso
         assert response.status_code in [302, 308, 401, 403]
     
     def test_descargar_fichajes_sin_autenticacion(self, client):
         """Test descargar fichajes sin autenticación"""
-        response = client.get('/descargar_fichajes')
+        response = client.get('/descargar_reporte_fichajes')
         
         # Debería denegar acceso
         assert response.status_code in [302, 308, 401, 403]
@@ -149,14 +153,14 @@ class TestNominas:
     
     def test_get_nominas_sin_autenticacion(self, client):
         """Test obtener nóminas sin autenticación"""
-        response = client.get('/get_nominas')
+        response = client.get('/get_nominas_guardadas')
         
         # Debería denegar acceso
         assert response.status_code in [302, 308, 401, 403]
     
     def test_preview_nomina_sin_datos(self, client):
         """Test preview de nómina sin datos"""
-        response = client.post('/preview_nomina', json={})
+        response = client.post('/parse_nomina', json={})
         
         # Debería retornar error o denegar acceso
         assert response.status_code in [200, 400, 401, 403]

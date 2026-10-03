@@ -173,19 +173,30 @@ document.addEventListener('DOMContentLoaded', () => {
         const infoVence = document.getElementById('infoVence');
         const ingresosListBody = document.getElementById('ingresosListBody');
 
-        document.getElementById('btnEntrada').addEventListener('click', () => setMode('entrada'));
-        document.getElementById('btnRegVisita').addEventListener('click', () => setMode('visita'));
-        document.getElementById('btnSalida').addEventListener('click', () => setMode('salida'));
-        document.getElementById('btnFichadorEntrada').addEventListener('click', () => setPunchMode('punch-in'));
-        document.getElementById('btnFichadorSalida').addEventListener('click', () => setPunchMode('punch-out'));
+        document.getElementById('btnEntrada')?.addEventListener('click', () => setMode('entrada'));
+        document.getElementById('btnRegVisita')?.addEventListener('click', () => setMode('visita'));
+        document.getElementById('btnSalida')?.addEventListener('click', () => setMode('salida'));
+        document.getElementById('btnFichadorEntrada')?.addEventListener('click', () => setPunchMode('punch-in'));
+        document.getElementById('btnFichadorSalida')?.addEventListener('click', () => setPunchMode('punch-out'));
 
-        document.getElementById('searchIngresos').addEventListener('keyup', (e) => {
-            const searchTerm = e.target.value.toLowerCase();
+        function applyFilters() {
+            const searchTerm = document.getElementById('searchIngresos').value.toLowerCase();
+            const tipoTerm = document.getElementById('filterTipo') ? document.getElementById('filterTipo').value.toLowerCase() : "";
             const rows = ingresosListBody.getElementsByTagName('tr');
+            
             Array.from(rows).forEach(row => {
-                row.style.display = row.textContent.toLowerCase().includes(searchTerm) ? '' : 'none';
+                const textContent = row.textContent.toLowerCase();
+                const matchesSearch = textContent.includes(searchTerm);
+                const matchesTipo = tipoTerm === "" || textContent.includes(tipoTerm);
+                
+                row.style.display = (matchesSearch && matchesTipo) ? '' : 'none';
             });
-        });
+        }
+
+        document.getElementById('searchIngresos')?.addEventListener('keyup', applyFilters);
+        if (document.getElementById('filterTipo')) {
+            document.getElementById('filterTipo').addEventListener('change', applyFilters);
+        }
 
         async function handleDniScan() {
             if (currentPunchMode) {
@@ -279,7 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const data = await response.json();
                 if (data.success) {
-                    window.location.href = '/admin';
+                    window.location.href = '/dashboard';
                 } else {
                     loginMessage.textContent = data.message || 'Error al iniciar sesión.';
                 }

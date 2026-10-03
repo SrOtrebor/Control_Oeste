@@ -18,7 +18,7 @@ a = Analysis(['app.py'],
                  ('nominas_persistentes.xlsx', '.')
              ],
              # AQUÍ AGREGAMOS LIBRERÍAS OCULTAS QUE PANDAS USA
-             hiddenimports=['pandas._libs.tslibs.base', 'openpyxl'],
+             hiddenimports=['pandas._libs.tslibs.base', 'openpyxl', 'xlsxwriter'],
              hookspath=[],
              hooksconfig={},
              runtime_hooks=[],
@@ -35,7 +35,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='ControlAcceso',
+    name='ControlAcceso_v5',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

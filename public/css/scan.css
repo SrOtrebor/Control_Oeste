@@ -1,0 +1,363 @@
+:root {
+    --bg-color: #f8fafc;
+    --panel-bg-color: #ffffff;
+    --border-color: #e2e8f0;
+    
+    --primary-color: #2563eb;
+    --secondary-color: #4f46e5;
+    
+    --success-color: #10b981;
+    --success-bg: rgba(16, 185, 129, 0.1);
+    
+    --error-color: #ef4444;
+    --error-bg: rgba(239, 68, 68, 0.1);
+    
+    --visita-color: #0ea5e9;
+    --salida-color: #f59e0b;
+    --neutral-color: #64748b;
+    
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --light-text-color: #ffffff;
+    --dark-text-color: #0f172a;
+    --body-bg-color: #f1f5f9;
+}
+
+/* General Body Styles */
+body {
+    font-family: 'Poppins', 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    color: var(--text-main);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.app-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header Styles */
+.header {
+    background-color: var(--primary-color);
+    color: var(--light-text-color);
+    padding: 15px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.3s ease;
+}
+
+.header-left h2, .header-left h3 {
+    margin: 0;
+}
+
+.header-button {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--light-text-color);
+    border: 1px solid var(--light-text-color);
+    padding: 10px 15px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background-color 0.3s, transform 0.2s;
+}
+
+.header-button:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+}
+
+/* Main Content Layout */
+.main-content {
+    display: flex;
+    flex: 1;
+    padding: 20px;
+    gap: 20px;
+}
+
+.left-panel, .right-panel {
+    background: var(--panel-bg-color);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    overflow-y: auto;
+}
+
+.left-panel {
+    flex: 1;
+}
+
+.right-panel {
+    flex: 2;
+}
+
+/* Result Display (Light Box) */
+#resultado {
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    margin-bottom: 20px;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    background-color: var(--neutral-color);
+    color: var(--light-text-color);
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+#mensajeResultado {
+    font-size: 2.2em;
+    font-weight: 700;
+    margin: 0;
+}
+
+/* Specificity fix for light box */
+#resultado.luz-verde { background-color: var(--success-color); }
+#resultado.luz-roja { background-color: var(--error-color); }
+#resultado.luz-azul { background-color: var(--visita-color); }
+#resultado.luz-gris { background-color: var(--neutral-color); }
+
+
+/* DNI Input */
+#dniInput {
+    width: calc(100% - 38px);
+    padding: 18px;
+    margin-bottom: 20px;
+    background: #f8fafc;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 1.1em;
+    color: var(--dark-text-color);
+    outline: none;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+#dniInput:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+}
+
+/* Control Buttons */
+.control-buttons-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.button-group {
+    display: flex;
+    gap: 10px;
+}
+
+.form-button {
+    flex-grow: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 5px;
+    background-color: var(--secondary-color);
+    color: var(--light-text-color);
+    cursor: pointer;
+    transition: background-color 0.3s, filter 0.3s, transform 0.2s;
+    font-size: 1em;
+    font-weight: 500;
+}
+
+.form-button:hover {
+    filter: brightness(1.1);
+}
+
+.form-button.active-mode {
+    filter: brightness(1.2);
+    transform: scale(1.05);
+    box-shadow: 0 0 10px rgba(0,0,0,0.2);
+}
+
+/* Dynamic Button and Header Colors by Mode */
+.control-acceso-mode .header,
+.control-acceso-mode .form-button {
+    background-color: var(--primary-color);
+}
+
+.registrar-visita-mode .header,
+.registrar-visita-mode .form-button {
+    background-color: var(--visita-color);
+}
+
+.salida-visita-mode .header,
+.salida-visita-mode .form-button {
+    background-color: var(--salida-color);
+}
+
+.registrar-entrada-mode .header,
+.registrar-entrada-mode .form-button {
+    background-color: var(--entrada-fichador-color);
+}
+
+.registrar-salida-mode .header,
+.registrar-salida-mode .form-button {
+    background-color: var(--salida-fichador-color);
+}
+
+
+.secondary-button {
+    background-color: var(--neutral-color);
+}
+
+.secondary-button:hover {
+    background-color: #7f8c8d;
+}
+
+/* Stats Container */
+.stats-container {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 20px;
+    gap: 15px;
+}
+
+.stat-box {
+    text-align: center;
+    padding: 15px;
+    border-radius: 8px;
+    flex-grow: 1;
+}
+
+.stat-value {
+    font-size: 2.5em;
+    font-weight: 700;
+}
+
+.stat-label {
+    font-size: 1em;
+    color: #666;
+}
+
+.stat-verde .stat-value { color: var(--success-color); }
+.stat-rojo .stat-value { color: var(--error-color); }
+
+
+/* Ingresos Table */
+#searchIngresos {
+    width: calc(100% - 22px);
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: #f8fafc;
+    color: var(--dark-text-color);
+}
+
+.ingresos-list-container {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+}
+
+.ingresos-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.ingresos-table th, .ingresos-table td {
+    border: 1px solid var(--border-color);
+    padding: 12px 15px;
+    text-align: left;
+    word-break: break-all;
+    color: var(--text-main);
+}
+
+.ingresos-table th {
+    background-color: rgba(0, 0, 0, 0.05);
+    position: sticky;
+    top: 0;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-size: 0.85em;
+    letter-spacing: 0.5px;
+}
+
+/* Footer */
+.app-footer {
+    background-color: var(--primary-color);
+    color: var(--light-text-color);
+    text-align: center;
+    padding: 0;
+    margin-top: auto;
+}
+
+/* Table row colors */
+.fila-verde { background-color: rgba(16, 185, 129, 0.15); }
+.fila-roja { background-color: rgba(239, 68, 68, 0.15); }
+.fila-gris { background-color: rgba(0, 0, 0, 0.05); }
+.fila-fao td:first-child { border-left: 5px solid #f59e0b; }
+
+/* Interactive rows */
+.ingresos-table tbody tr {
+    cursor: pointer;
+    transition: filter 0.2s;
+}
+.ingresos-table tbody tr:hover {
+    filter: brightness(0.95);
+}
+
+/* Login Form Specific Styles */
+.form-container {
+    background: var(--panel-bg-color);
+    padding: 40px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    width: 500px;
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.form-container h2 {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.form-container .input-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-container label {
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.form-container input {
+    padding: 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    font-size: 1.1em;
+}
+
+.error-message {
+    color: var(--error-color);
+    text-align: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .main-content {
+        flex-direction: column;
+    }
+    .header {
+        flex-direction: column;
+        gap: 10px;
+        padding: 20px;
+    }
+    .stats-container {
+        flex-direction: column;
+    }
+}

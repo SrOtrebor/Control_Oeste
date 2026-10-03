@@ -15,9 +15,10 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
+from config import BASE_DIR
 
 # Directorio de logs
-LOGS_DIR = os.path.join(os.path.dirname(__file__), 'logs')
+LOGS_DIR = os.path.join(BASE_DIR, 'logs')
 os.makedirs(LOGS_DIR, exist_ok=True)
 
 # Formato de logs

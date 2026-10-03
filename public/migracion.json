@@ -1,0 +1,12 @@
+{
+  "lista_negra": [],
+  "nominas": [
+    {
+      "dni": "12345678",
+      "nombre": "Perez Juan",
+      "categoria": "FAO",
+      "puesto_especifico": "TEST",
+      "activo": true
+    }
+  ]
+}

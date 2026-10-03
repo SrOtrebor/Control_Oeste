@@ -9,11 +9,17 @@ from config import (
 )
 from logger_config import get_logger, log_access_event
 
-# --- INICIO DE LA CORRECCIÓN ---
-# Importamos el MÓDULO 'data_manager' en lugar de las variables
 import data_manager
 from data_manager import formatear_excel
-# --- FIN DE LA CORRECCIÓN ---
+from db_queries import (
+    guardar_estado_adentro_sqlite, 
+    borrar_estado_adentro_sqlite, 
+    loggear_acceso_sqlite,
+    verificar_dni_sqlite, 
+    registrar_fichaje_sqlite
+)
+from alert_queries import es_persona_de_interes
+from alert_manager import send_alert
 
 # Logger para este módulo
 logger = get_logger(__name__)
@@ -22,18 +28,126 @@ logger = get_logger(__name__)
 # Conjunto para llevar registro de personas actualmente dentro
 personas_adentro = {}
 
-def parsear_codigo_barra(scanner_data):
-    # (Tu lógica de parseo original está aquí, no se cambia)
-    parts = scanner_data.strip().split('"')
-    if len(parts) >= 8:
+def restaurar_estado_adentro():
+    """Recupera el estado de personas_adentro leyendo los registros de hoy."""
+    global personas_adentro
+    personas_adentro.clear()
+    fecha_actual_str = datetime.now().strftime('%Y-%m-%d')
+    
+    # 1. Recuperar de registros de ingreso
+    archivo_ingreso = os.path.join(REGISTROS_DIARIOS_DIR, f'registros_ingreso_{fecha_actual_str}.xlsx')
+    if os.path.exists(archivo_ingreso):
         try:
+            df = pd.read_excel(archivo_ingreso)
+            df['DNI'] = df['DNI'].astype(str)
+            for _, row in df.iterrows():
+                evento = str(row.get('Evento', ''))
+                hora_salida = row.get('Hora_Salida')
+                dni = row['DNI']
+                if 'Entrada' in evento and (pd.isna(hora_salida) or hora_salida == '' or str(hora_salida).lower() == 'nan'):
+                    personas_adentro[dni] = row.get('Tipo_Permiso', 'Desconocido')
+                elif 'Salida' in evento and dni in personas_adentro:
+                    # En la lógica original la salida actualizaba la fila de entrada,
+                    # pero por si hay una fila de salida separada, lo sacamos:
+                    personas_adentro.pop(dni, None)
+        except Exception as e:
+            logger.error(f"Error al restaurar ingresos: {e}")
+
+    # 2. Recuperar de registros de fichaje
+    archivo_fichaje = os.path.join(REGISTROS_FICHAJES_DIR, f'registros_fichaje_{fecha_actual_str}.xlsx')
+    if os.path.exists(archivo_fichaje):
+        try:
+            df = pd.read_excel(archivo_fichaje)
+            df['DNI'] = df['DNI'].astype(str)
+            for _, row in df.iterrows():
+                hora_entrada = row.get('Hora_Entrada')
+                hora_salida = row.get('Hora_Salida')
+                dni = row['DNI']
+                if pd.notna(hora_entrada) and hora_entrada != '' and (pd.isna(hora_salida) or hora_salida == ''):
+                    personas_adentro[dni] = 'NOMINA'
+        except Exception as e:
+            logger.error(f"Error al restaurar fichajes: {e}")
+            
+    logger.info(f"Estado restaurado: {len(personas_adentro)} personas adentro hoy.")
+
+def parsear_codigo_barra(scanner_data):
+    """
+    Parsea datos de escáner de código de barras / QR de DNI argentino.
+    Soporta múltiples formatos:
+    
+    Formato 1 - QR DNI nuevo (2024+):
+      {nro_tramite}"{apellido}"{nombre}"{dni}"{ejemplar}"{fecha_nac}"{fecha_venc}"{JWT}
+      Ejemplo: 00754162114"CARDOSO PRESTES"ELIAS MARTIN"44678808"F"31-01-03"06-08-26"eyJ...
+    
+    Formato 2 - Código de barras DNI viejo:
+      "{dni}"{tipo}"{num}"{apellido}"{nombre}"{nacionalidad}"{fecha_nac}"{sexo}"...
+      Ejemplo: "32759772    "B"1"GOROSITO"MATIAS DANIEL"ARGENTINA"19-11-1986"M"...
+    
+    Formato 3 - Código de barras estándar (formato original):
+      ..."{apellido}"{nombre}"{sexo}"{dni}"..."{fecha_nac}"{fecha_venc}"...
+    
+    Formato 4 - @ separado por guiones bajos:
+      @APELLIDO_NOMBRE_SEXO_DNI_...
+    """
+    parts = scanner_data.strip().split('"')
+    
+    if len(parts) >= 7:
+        try:
+            # --- Formato 1: QR DNI nuevo ---
+            # Detectar: parts[0] es un número de trámite (dígitos), parts[3] es el DNI
+            # Estructura: tramite"apellido"nombre"dni"ejemplar"nacimiento"vencimiento"JWT
+            if parts[0].strip().isdigit() and len(parts[0].strip()) >= 9:
+                dni = parts[3].strip()
+                if dni.isdigit() and 7 <= len(dni) <= 8:
+                    apellido = parts[1].strip()
+                    nombre = parts[2].strip()
+                    ejemplar = parts[4].strip()
+                    fecha_nacimiento = parts[5].strip() if len(parts) > 5 else ''
+                    fecha_vencimiento = parts[6].strip() if len(parts) > 6 else ''
+                    logger.debug(f"Formato QR DNI nuevo detectado - DNI: {dni}, Nombre: {nombre} {apellido}")
+                    return {
+                        'dni': dni, 'nombre': nombre, 'apellido': apellido,
+                        'ejemplar': ejemplar,
+                        'fecha_nacimiento': fecha_nacimiento,
+                        'fecha_vencimiento': fecha_vencimiento,
+                        'nombre_completo': f"{nombre} {apellido}"
+                    }
+
+            # --- Formato 2: Código de barras DNI viejo ---
+            # Detectar: parts[0] es vacío (empieza con "), parts[1] es el DNI
+            # Estructura: "dni"tipo"num"apellido"nombre"nacionalidad"nacimiento"sexo"...
+            if parts[0].strip() == '' and len(parts) >= 8:
+                posible_dni = parts[1].strip()
+                if posible_dni.isdigit() and 7 <= len(posible_dni) <= 8:
+                    apellido = parts[4].strip() if len(parts) > 4 else ''
+                    nombre = parts[5].strip() if len(parts) > 5 else ''
+                    sexo = parts[8].strip() if len(parts) > 8 else ''
+                    fecha_nacimiento = parts[7].strip() if len(parts) > 7 else ''
+                    # Fecha de vencimiento está más adelante en este formato
+                    fecha_vencimiento = ''
+                    for i in range(9, min(len(parts), 15)):
+                        p = parts[i].strip()
+                        if re.match(r'^\d{2}-\d{2}-\d{4}$', p):
+                            fecha_vencimiento = p
+                    logger.debug(f"Formato DNI viejo detectado - DNI: {posible_dni}, Nombre: {nombre} {apellido}")
+                    return {
+                        'dni': posible_dni, 'nombre': nombre, 'apellido': apellido,
+                        'sexo': sexo,
+                        'fecha_nacimiento': fecha_nacimiento,
+                        'fecha_vencimiento': fecha_vencimiento,
+                        'nombre_completo': f"{nombre} {apellido}"
+                    }
+
+            # --- Formato 3: Código de barras estándar (original) ---
+            # Estructura: ..."{apellido}"{nombre}"{sexo}"{dni}"..."{fecha_nac}"{fecha_venc}"...
             apellido = parts[1].strip()
             nombre = parts[2].strip()
             sexo = parts[3].strip()
             dni = parts[4].strip()
-            fecha_nacimiento = parts[6].strip()
-            fecha_vencimiento = parts[7].strip()
+            fecha_nacimiento = parts[6].strip() if len(parts) > 6 else ''
+            fecha_vencimiento = parts[7].strip() if len(parts) > 7 else ''
             if dni.isdigit() and 7 <= len(dni) <= 8:
+                logger.debug(f"Formato estándar detectado - DNI: {dni}, Nombre: {nombre} {apellido}")
                 return {
                     'dni': dni, 'nombre': nombre, 'apellido': apellido, 'sexo': sexo,
                     'fecha_nacimiento': fecha_nacimiento, 'fecha_vencimiento': fecha_vencimiento,
@@ -42,6 +156,7 @@ def parsear_codigo_barra(scanner_data):
         except IndexError:
             pass
 
+    # --- Formato 4: @ separado por guiones bajos ---
     match = re.search(r'@([^_]+)_([^_]+)_([^_]+)_([^_]+)_', scanner_data)
     if match:
         return {
@@ -49,10 +164,12 @@ def parsear_codigo_barra(scanner_data):
             'sexo': match.group(3), 'nombre_completo': f"{match.group(2)} {match.group(1)}"
         }
 
+    # --- Fallback: buscar cualquier secuencia de 7-8 dígitos ---
     match_dni = re.search(r'\b(\d{7,8})\b', scanner_data)
     if match_dni:
         return {'dni': match_dni.group(1)}
 
+    # --- Último recurso: extraer todos los dígitos ---
     dni_solo_digitos = re.sub(r'\D', '', scanner_data)
     if dni_solo_digitos:
         return {'dni': dni_solo_digitos}
@@ -141,7 +258,7 @@ def registrar_evento_fichaje(dni, nombre, fecha, hora_entrada, hora_salida):
         logger.error(f"Error crítico al guardar registro de fichaje: {e}", exc_info=True)
         return False
 
-def verificar_dni(scanner_data, mode):
+def verificar_dni(scanner_data, mode, puerta="Master", tipo_visita=""):
     logger.debug("Iniciando nueva verificación de DNI")
     parsed_data = parsear_codigo_barra(scanner_data)
     
@@ -157,153 +274,103 @@ def verificar_dni(scanner_data, mode):
     dni_limpio_str = re.sub(r'[\.\s-]', '', str(dni_ingresado_str)).strip()
     logger.debug(f"DNI parseado y limpiado: '{dni_limpio_str}'")
 
-    # --- LÓGICA DE SALIDA / VISITA (sin cambios) ---
+    # --- CHECK LISTA NEGRA (ALERTA SILENCIOSA O DIRECTA) ---
+    es_interes, motivo_interes = es_persona_de_interes(dni_limpio_str)
+    if es_interes:
+        send_alert(dni_limpio_str, nombre_completo_scanner, f"ALERTA (Lista Negra): {motivo_interes}", nivel="danger")
+
+    # --- LÓGICA DE SALIDA / VISITA (MIGRADA A SQLITE LOGGING) ---
     if mode == 'salida':
         if dni_limpio_str in personas_adentro:
-            entry_type = personas_adentro.pop(dni_limpio_str) # Quita a la persona y obtiene su tipo
+            entry_type = personas_adentro.pop(dni_limpio_str)
 
-            # Si era un visitante, registra un evento de salida de visita separado
             if entry_type == 'VISITA':
                 registrar_evento(dni_limpio_str, nombre_completo_scanner, hora_actual_str, 'Visita Salida', 'VISITA', 'N/A', 'N/A', 'Visita', 'REGISTRADO')
+                loggear_acceso_sqlite(dni_limpio_str, nombre_completo_scanner, 'SALIDA', 'VISITA', 'N/A', 'N/A', 'N/A', 'REGISTRADO', puerta=puerta, tipo_visita=tipo_visita)
             else:
-                # Para todos los demás (empleados), usa el evento de salida estándar para consolidar
                 registrar_evento(dni_limpio_str, nombre_completo_scanner, hora_actual_str, 'Salida', 'N/A', 'N/A', 'N/A', 'Salida', 'REGISTRADO')
+                loggear_acceso_sqlite(dni_limpio_str, nombre_completo_scanner, 'SALIDA', entry_type, 'N/A', 'N/A', 'N/A', 'REGISTRADO', puerta=puerta, tipo_visita="")
             
+            borrar_estado_adentro_sqlite(dni_limpio_str)
             return {'acceso': 'PERMITIDO', 'mensaje': 'Salida Registrada', 'nombre': nombre_completo_scanner}
         else:
+            if not es_interes:
+                send_alert(dni_limpio_str, nombre_completo_scanner, "Intento de salida, pero no estaba registrado adentro.", nivel="warning")
             return {'acceso': 'DENEGADO', 'mensaje': 'Error: Persona no registrada adentro', 'nombre': ''}
 
     if mode == 'visita':
         personas_adentro[dni_limpio_str] = 'VISITA'
         registrar_evento(dni_limpio_str, nombre_completo_scanner, hora_actual_str, 'Visita Entrada', 'VISITA', 'N/A', 'N/A', 'Visita', 'AUTORIZADO')
+        loggear_acceso_sqlite(dni_limpio_str, nombre_completo_scanner, 'ENTRADA_VISITA', 'VISITA', 'N/A', 'N/A', 'N/A', 'AUTORIZADO', puerta=puerta, tipo_visita=tipo_visita)
+        guardar_estado_adentro_sqlite(dni_limpio_str, nombre_completo_scanner, hora_actual_str, 'VISITA', 'N/A', puerta=puerta)
         return {'acceso': 'PERMITIDO', 'mensaje': 'Visita Registrada', 'nombre': nombre_completo_scanner}
 
-    # --- LÓGICA DE ENTRADA (CORREGIDA) ---
+    # --- LÓGICA DE ENTRADA (MIGRADA A SQLITE + IRSA DIGITAL) ---
     if mode == 'entrada':
-        logger.debug("Modo 'entrada' seleccionado. Verificando todas las listas")
-        data_manager.cargar_autorizaciones() 
+        logger.debug("Modo 'entrada' seleccionado. Verificando...")
         
-        # --- 1. Verificar en Nóminas Persistentes ---
-        logger.debug("Verificando en Nóminas Persistentes")
-        df_nominas_persistentes = data_manager.get_df_nominas_persistentes()
-        if not df_nominas_persistentes.empty and COL_DNI in df_nominas_persistentes.columns:
-            match = df_nominas_persistentes[df_nominas_persistentes[COL_DNI] == dni_limpio_str]
-            if not match.empty:
-                logger.debug(f"DNI {dni_limpio_str} encontrado en Nóminas Persistentes")
-                persona = match.iloc[0]
-                desde = persona.get('Vigencia Desde')
-                hasta = persona.get('Vigencia Hasta')
+        permiso = None
+        
+        # 1. Validar en listado directo de IRSA (FAOs y FAPs digitales)
+        try:
+            directorio_irsa = data_manager.obtener_directorio_irsa()
+            for p in directorio_irsa:
+                if re.sub(r'[\.\s-]', '', str(p.get('dni', ''))).strip() == dni_limpio_str:
+                    permiso = {
+                        'nombre': p.get('nombre', 'Desconocido'),
+                        'local': p.get('empresa', 'N/A'),
+                        'tarea': 'Trabajos Generales',
+                        'vence': p.get('vence', 'Indefinido'),
+                        'tipo_permiso': p.get('tipo', 'IRSA'),
+                        'num_permiso': p.get('numero', 'N/A')
+                    }
+                    logger.debug(f"Permiso encontrado en IRSA Digital: {permiso}")
+                    break
+        except Exception as e:
+            logger.error(f"Error al verificar en directorio IRSA digital: {e}")
 
-                # LÓGICA CORREGIDA:
-                # 1. Si no hay fechas de vigencia, el permiso es válido por defecto.
-                # 2. Si hay fechas, deben estar dentro del rango válido.
-                fechas_validas = pd.notna(desde) and pd.notna(hasta)
-                if not fechas_validas or (fechas_validas and pd.Timestamp(desde) <= hoy <= pd.Timestamp(hasta)):
-                    nombre = persona.get(COL_NOMBRE_APELLIDO, 'N/A')
-                    local = persona.get(COL_LOCAL, 'N/A')
-                    tarea = persona.get(COL_TAREA, 'N/A')
-                    vence_str = pd.Timestamp(hasta).strftime('%d/%m/%Y') if fechas_validas else 'Indefinido'
-                    
-                    logger.info(f"Acceso PERMITIDO - DNI: {dni_limpio_str}, Nombre: {nombre}, Tipo: Nómina Persistente")
-                    log_access_event(dni_limpio_str, nombre, 'PERMITIDO', 'Nomina Persistente', f'Local: {local}')
-                    
-                    personas_adentro[dni_limpio_str] = 'Nomina Persistente'
-                    registrar_evento(dni_limpio_str, nombre, hora_actual_str, 'Entrada OK', 'Nomina Persistente', 'N/A', local, tarea, 'AUTORIZADO')
-                    return {'acceso': 'PERMITIDO', 'nombre': nombre, 'mensaje': f'ACCESO PERMITIDO (Nomina): {nombre}', 'tipo_permiso': 'Nomina Persistente', 'num_permiso': 'N/A', 'local': local, 'tarea': tarea, 'vence': vence_str}
-                else:
-                    logger.debug(f"Permiso de Nómina Persistente vencido para DNI {dni_limpio_str}")
-            else:
-                logger.debug(f"DNI {dni_limpio_str} no encontrado en Nóminas Persistentes")
-
-        # --- 2. Verificar en lista FAP ---
-        logger.debug("Verificando en FAP")
-        if not data_manager.df_fap.empty and COL_DNI in data_manager.df_fap.columns:
-            match = data_manager.df_fap[data_manager.df_fap[COL_DNI] == dni_limpio_str]
-            if not match.empty:
-                logger.debug(f"DNI {dni_limpio_str} encontrado en FAP")
-                persona = match.iloc[0]
-                vence_val = persona.get(COL_VENCE)
-                if pd.notna(vence_val) and hoy.date() <= pd.Timestamp(vence_val).date():
-                    nombre = persona.get(COL_NOMBRE_APELLIDO, 'N/A')
-                    tipo_permiso = persona.get(COL_TIPO_PERMISO, 'FAP')
-                    num_permiso = persona.get(COL_NUM_PERMISO, 'N/A')
-                    local = persona.get(COL_LOCAL, 'N/A')
-                    tarea = persona.get(COL_TAREA, 'N/A')
-                    vence_str = pd.Timestamp(vence_val).strftime('%d/%m/%Y')
-                    
-                    logger.info(f"Acceso PERMITIDO - DNI: {dni_limpio_str}, Nombre: {nombre}, Tipo: FAP")
-                    log_access_event(dni_limpio_str, nombre, 'PERMITIDO', 'FAP', f'Local: {local}, Vence: {vence_str}')
-                    
-                    personas_adentro[dni_limpio_str] = tipo_permiso
-                    registrar_evento(dni_limpio_str, nombre, hora_actual_str, 'Entrada OK', tipo_permiso, num_permiso, local, tarea, 'AUTORIZADO')
-                    return {'acceso': 'PERMITIDO', 'nombre': nombre, 'mensaje': f'ACCESO PERMITIDO (FAP): {nombre}', 'tipo_permiso': tipo_permiso, 'num_permiso': num_permiso, 'local': local, 'tarea': tarea, 'vence': vence_str}
-                else:
-                    logger.debug(f"Permiso FAP vencido para DNI {dni_limpio_str}")
-            else:
-                logger.debug(f"DNI {dni_limpio_str} no encontrado en FAP")
-
-        # --- 3. Verificar en lista FAO ---
-        logger.debug("Verificando en FAO")
-        if not data_manager.df_fao.empty and COL_DNI in data_manager.df_fao.columns:
-            match = data_manager.df_fao[data_manager.df_fao[COL_DNI] == dni_limpio_str]
-            if not match.empty:
-                logger.debug(f"DNI {dni_limpio_str} encontrado en FAO")
-                persona = match.iloc[0]
-                vence_val = persona.get(COL_VENCE)
-                if pd.notna(vence_val) and hoy.date() <= pd.Timestamp(vence_val).date():
-                    nombre = persona.get(COL_NOMBRE_APELLIDO, 'N/A')
-                    tipo_permiso = persona.get(COL_TIPO_PERMISO, 'FAO')
-                    num_permiso = persona.get(COL_NUM_PERMISO, 'N/A')
-                    local = persona.get(COL_LOCAL, 'N/A')
-                    tarea = persona.get(COL_TAREA, 'N/A')
-                    vence_str = pd.Timestamp(vence_val).strftime('%d/%m/%Y')
-                    
-                    logger.info(f"Acceso PERMITIDO - DNI: {dni_limpio_str}, Nombre: {nombre}, Tipo: FAO")
-                    log_access_event(dni_limpio_str, nombre, 'PERMITIDO', 'FAO', f'Local: {local}, Vence: {vence_str}')
-                    
-                    personas_adentro[dni_limpio_str] = tipo_permiso
-                    registrar_evento(dni_limpio_str, nombre, hora_actual_str, 'Entrada OK', tipo_permiso, num_permiso, local, tarea, 'AUTORIZADO')
-                    return {'acceso': 'PERMITIDO', 'nombre': nombre, 'mensaje': f'ACCESO PERMITIDO (FAO): {nombre}', 'tipo_permiso': tipo_permiso, 'num_permiso': num_permiso, 'local': local, 'tarea': tarea, 'vence': vence_str}
-                else:
-                    logger.debug(f"Permiso FAO vencido para DNI {dni_limpio_str}")
-            else:
-                logger.debug(f"DNI {dni_limpio_str} no encontrado en FAO")
-
-        # --- 4. Verificar en lista de excepciones ---
-        logger.debug("Verificando en Excepciones")
-        if not data_manager.df_excepciones.empty and COL_DNI in data_manager.df_excepciones.columns:
-            match = data_manager.df_excepciones[data_manager.df_excepciones[COL_DNI] == dni_limpio_str]
-            if not match.empty:
-                logger.debug(f"DNI {dni_limpio_str} encontrado en Excepciones")
-                excepcion = match.iloc[0]
-                vence_val = excepcion.get(COL_VENCE)
-                if pd.notna(vence_val) and hoy.date() <= pd.Timestamp(vence_val).date():
-                    nombre = excepcion.get(COL_NOMBRE_APELLIDO, 'N/A')
-                    local = excepcion.get(COL_LOCAL, 'N/A')
-                    vence_str = pd.Timestamp(vence_val).strftime('%d/%m/%Y')
-                    quien_autoriza = excepcion.get('Quien_Autoriza', 'N/A')
-                    
-                    logger.info(f"Acceso PERMITIDO - DNI: {dni_limpio_str}, Nombre: {nombre}, Tipo: Excepción")
-                    log_access_event(dni_limpio_str, nombre, 'PERMITIDO', 'Excepcion', f'Autoriza: {quien_autoriza}, Vence: {vence_str}')
-                    
-                    personas_adentro[dni_limpio_str] = 'Excepcion'
-                    registrar_evento(dni_limpio_str, nombre, hora_actual_str, 'Entrada OK', 'Excepcion', quien_autoriza, local, 'N/A', 'AUTORIZADO')
-                    return {'acceso': 'PERMITIDO', 'nombre': nombre, 'mensaje': f'ACCESO PERMITIDO (Excepción): {nombre}', 'tipo_permiso': 'Excepcion', 'num_permiso': quien_autoriza, 'local': local, 'tarea': 'N/A', 'vence': vence_str}
-                else:
-                    logger.debug(f"Excepción vencida para DNI {dni_limpio_str}")
-            else:
-                logger.debug(f"DNI {dni_limpio_str} no encontrado en Excepciones")
-
-        # --- 5. Decisión final si no se encontró permiso válido ---
-        logger.warning(f"Acceso DENEGADO - DNI: {dni_limpio_str} no encontrado o sin permiso vigente")
-        log_access_event(dni_limpio_str, 'No Autorizado', 'DENEGADO', 'N/A', 'Sin permiso válido')
-        mensaje = f'ACCESO DENEGADO: DNI {dni_limpio_str} no encontrado o sin permiso vigente.'
-        registrar_evento(dni_limpio_str, 'No Autorizado', hora_actual_str, 'Entrada RECHAZADA', 'N/A', 'N/A', 'N/A', 'N/A', 'DENEGADO')
-        return {'acceso': 'DENEGADO', 'nombre': 'No Autorizado', 'mensaje': mensaje}
+        # 2. Si no está en IRSA directo, buscar en base de datos SQLite (Nóminas, Excepciones, etc)
+        if not permiso:
+            permiso = verificar_dni_sqlite(dni_limpio_str)
+        
+        if permiso:
+            nombre = permiso['nombre']
+            local = permiso['local']
+            tarea = permiso['tarea']
+            vence_str = permiso['vence']
+            tipo_permiso = permiso['tipo_permiso']
+            num_permiso = permiso['num_permiso']
+            
+            logger.info(f"Acceso PERMITIDO - DNI: {dni_limpio_str}, Nombre: {nombre}, Tipo: {tipo_permiso}")
+            log_access_event(dni_limpio_str, nombre, 'PERMITIDO', tipo_permiso, f'Local: {local}, Vence: {vence_str}')
+            
+            personas_adentro[dni_limpio_str] = tipo_permiso
+            
+            # Dual Logging: Guardamos en Excel (antiguo) y en SQLite (nuevo)
+            registrar_evento(dni_limpio_str, nombre, hora_actual_str, 'Entrada OK', tipo_permiso, num_permiso, local, tarea, 'AUTORIZADO')
+            loggear_acceso_sqlite(dni_limpio_str, nombre, 'ENTRADA', tipo_permiso, num_permiso, local, tarea, 'AUTORIZADO', puerta=puerta, tipo_visita="")
+            guardar_estado_adentro_sqlite(dni_limpio_str, nombre, hora_actual_str, tipo_permiso, local, puerta=puerta)
+            
+            return {
+                'acceso': 'PERMITIDO', 'nombre': nombre, 'mensaje': f'ACCESO PERMITIDO ({tipo_permiso}): {nombre}', 
+                'tipo_permiso': tipo_permiso, 'num_permiso': num_permiso, 'local': local, 'tarea': tarea, 'vence': vence_str
+            }
+        else:
+            logger.warning(f"Acceso DENEGADO - DNI: {dni_limpio_str} no encontrado o sin permiso vigente")
+            log_access_event(dni_limpio_str, 'No Autorizado', 'DENEGADO', 'N/A', 'Sin permiso válido')
+            mensaje = f'ACCESO DENEGADO: DNI {dni_limpio_str} no encontrado o sin permiso vigente.'
+            
+            if not es_interes: # Si ya mandamos alerta por lista negra, no duplicamos
+                send_alert(dni_limpio_str, nombre_completo_scanner, "ACCESO DENEGADO: Sin permiso válido", nivel="warning")
+            
+            registrar_evento(dni_limpio_str, 'No Autorizado', hora_actual_str, 'Entrada RECHAZADA', 'N/A', 'N/A', 'N/A', 'N/A', 'DENEGADO')
+            loggear_acceso_sqlite(dni_limpio_str, 'No Autorizado', 'ENTRADA_RECHAZADA', 'N/A', 'N/A', 'N/A', 'N/A', 'DENEGADO', 'Sin permiso válido', puerta=puerta)
+            
+            return {'acceso': 'DENEGADO', 'nombre': 'No Autorizado', 'mensaje': mensaje}
 
     return {'acceso': 'DENEGADO', 'mensaje': 'Modo no reconocido.'}
 
-def registrar_fichaje(scanner_data, mode):
+def registrar_fichaje(scanner_data, mode, puerta="Master", puesto_seleccionado=""):
     parsed_data = parsear_codigo_barra(scanner_data)
     if not parsed_data or 'dni' not in parsed_data:
         return {'acceso': 'DENEGADO', 'mensaje': 'DNI no válido.', 'nombre': ''}
@@ -326,6 +393,11 @@ def registrar_fichaje(scanner_data, mode):
     if mode == 'punch-in':
         personas_adentro[dni] = 'NOMINA'
         registrar_evento_fichaje(dni, nombre_completo, fecha_hoy_str, hora_actual_str, '')
+        registrar_fichaje_sqlite(dni, nombre_completo, 'ENTRADA', puerta=puerta, puesto_seleccionado=puesto_seleccionado)
+        registrar_evento(dni, nombre_completo, hora_actual_str, 'Fichaje Entrada', 'NOMINA', 'N/A', 'N/A', 'Fichaje', 'AUTORIZADO')
+        loggear_acceso_sqlite(dni, nombre_completo, 'FICHAJE_ENTRADA', 'NOMINA', 'N/A', 'N/A', 'N/A', 'AUTORIZADO', puerta=puerta)
+        guardar_estado_adentro_sqlite(dni, nombre_completo, hora_actual_str, 'NOMINA', 'N/A', puerta=puerta)
+        
         return {
             'acceso': 'PERMITIDO', 'mensaje': 'Entrada Registrada Correctamente',
             'nombre': nombre_completo, 'hora_entrada': hora_actual_str
@@ -336,12 +408,23 @@ def registrar_fichaje(scanner_data, mode):
             return {'acceso': 'DENEGADO', 'mensaje': 'Error: No hay registros de entrada hoy.', 'nombre': nombre_completo}
         df_fichajes_hoy = pd.read_excel(nombre_archivo_fichajes)
         df_fichajes_hoy['DNI'] = df_fichajes_hoy['DNI'].astype(str)
+        
+        # Logica original
+        if dni not in df_fichajes_hoy['DNI'].values:
+             return {'acceso': 'DENEGADO', 'mensaje': 'Error: No se encontró registro de entrada para hoy.', 'nombre': nombre_completo}
+             
+        registrar_evento_fichaje(dni, nombre_completo, fecha_hoy_str, '', hora_actual_str)
+        registrar_fichaje_sqlite(dni, nombre_completo, 'SALIDA', puerta=puerta)
+        registrar_evento(dni, nombre_completo, hora_actual_str, 'Fichaje Salida', 'NOMINA', 'N/A', 'N/A', 'Fichaje', 'REGISTRADO')
+        loggear_acceso_sqlite(dni, nombre_completo, 'FICHAJE_SALIDA', 'NOMINA', 'N/A', 'N/A', 'N/A', 'REGISTRADO', puerta=puerta)
+        borrar_estado_adentro_sqlite(dni)
         registro_entrada = df_fichajes_hoy[df_fichajes_hoy['DNI'] == dni]
         if registro_entrada.empty:
             return {'acceso': 'DENEGADO', 'mensaje': 'Error: No se encontró registro de entrada para hoy.', 'nombre': nombre_completo}
         personas_adentro.pop(dni, None)
         hora_entrada = registro_entrada.iloc[0].get('Hora_Entrada', 'N/A')
         registrar_evento_fichaje(dni, nombre_completo, fecha_hoy_str, hora_entrada, hora_actual_str)
+        registrar_evento(dni, nombre_completo, hora_actual_str, 'Fichaje Salida', 'NOMINA', 'N/A', 'N/A', 'Fichaje', 'REGISTRADO')
         return {
             'acceso': 'PERMITIDO', 'mensaje': 'Salida Registrada Correctamente',
             'nombre': nombre_completo, 'hora_entrada': hora_entrada, 'hora_salida': hora_actual_str

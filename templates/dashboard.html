@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Dashboard - Control de Acceso AOS</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=3.0">
+
+</head>
+
+<body>
+
+    <!-- Header -->
+
+    <header class="dash-header">
+
+        <div class="dash-header-left">
+
+            <h1><span class="material-icons">security</span> Control de Acceso</h1>
+
+            <span class="dash-sede">Al Oeste Shopping</span>
+
+        </div>
+
+        <div class="dash-header-right">
+
+            <div class="dash-live-indicator">
+
+                <span class="live-dot"></span>
+
+                <span id="lastUpdate">--:--:--</span>
+
+            </div>
+
+            <nav class="dash-nav">
+
+                <a href="/admin" class="dash-nav-link"><span class="material-icons">settings</span>Admin</a>
+
+                <a href="/logout" class="dash-nav-link"><span class="material-icons">logout</span>Salir</a>
+
+            </nav>
+
+        </div>
+
+    </header>
+
+
+
+    <main class="dash-main">
+
+        <!-- Stats Cards -->
+
+        <section class="dash-stats">
+
+            <div class="stat-card stat-alerts" id="cardAlertas" onclick="mostrarHistorialAlertas()" style="cursor: pointer; transition: all 0.3s ease;">
+
+                <span class="material-icons stat-icon" style="color: #ff3b30;">warning</span>
+
+                <div class="stat-info">
+
+                    <span class="stat-value" id="statAlertas" style="color: #ff3b30;">0</span>
+
+                    <span class="stat-label" style="color: #ff3b30; font-weight: 600;">Alertas</span>
+
+                </div>
+
+            </div>
+
+            <div class="stat-card stat-inside" onclick="window.filterAndGoTo('adentro')" style="cursor: pointer;">
+
+                <span class="material-icons stat-icon">groups</span>
+
+                <div class="stat-info">
+
+                    <span class="stat-value" id="statAdentro">0</span>
+
+                    <span class="stat-label">Personas adentro</span>
+
+                </div>
+
+            </div>
+
+            <div class="stat-card stat-entries" onclick="window.filterAndGoTo('accesos', 'filterAccesoResultado', 'AUTORIZADO')" style="cursor: pointer;">
+
+                <span class="material-icons stat-icon">login</span>
+
+                <div class="stat-info">
+
+                    <span class="stat-value" id="statEntradas">0</span>
+
+                    <span class="stat-label">Entradas hoy</span>
+
+                </div>
+
+            </div>
+
+            <div class="stat-card stat-exits" onclick="window.filterAndGoTo('accesos')" style="cursor: pointer;">
+
+                <span class="material-icons stat-icon">logout</span>
+
+                <div class="stat-info">
+
+                    <span class="stat-value" id="statSalidas">0</span>
+
+                    <span class="stat-label">Salidas hoy</span>
+
+                </div>
+
+            </div>
+
+            <div class="stat-card stat-denied" onclick="window.filterAndGoTo('accesos', 'filterAccesoResultado', 'DENEGADO')" style="cursor: pointer;">
+
+                <span class="material-icons stat-icon">block</span>
+
+                <div class="stat-info">
+
+                    <span class="stat-value" id="statRechazos">0</span>
+
+                    <span class="stat-label">Rechazos</span>
+
+                </div>
+
+            </div>
+
+            <div class="stat-card stat-visits" onclick="window.filterAndGoTo('accesos')" style="cursor: pointer;">
+
+                <span class="material-icons stat-icon">badge</span>
+
+                <div class="stat-info">
+
+                    <span class="stat-value" id="statVisitas">0</span>
+
+                    <span class="stat-label">Visitas</span>
+
+                </div>
+
+            </div>
+
+            <div class="stat-card stat-fichajes" onclick="window.filterAndGoTo('fichajes')" style="cursor: pointer;">
+
+                <span class="material-icons stat-icon">fingerprint</span>
+
+                <div class="stat-info">
+
+                    <span class="stat-value" id="statFichajes">0</span>
+
+                    <span class="stat-label">Fichajes hoy</span>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- Tab Navigation -->
+
+        <section class="dash-tabs-container">
+
+            <div class="dash-tabs">
+
+                <button class="dash-tab active" data-tab="accesos">
+
+                    <span class="material-icons">login</span> Accesos del día
+
+                </button>
+
+                <button class="dash-tab" data-tab="fichajes">
+
+                    <span class="material-icons">fingerprint</span> Fichajes
+
+                </button>
+
+                <button class="dash-tab" data-tab="adentro">
+
+                    <span class="material-icons">groups</span> Personas adentro
+
+                </button>
+
+                <button class="dash-tab" data-tab="auditoria">
+
+                    <span class="material-icons">search</span> Auditoría
+
+                </button>
+
+                <button class="dash-tab" data-tab="directorio">
+
+                    <span class="material-icons">contact_page</span> Nóminas
+
+                </button>
+
+                <button class="dash-tab" data-tab="tramites">
+
+                    <span class="material-icons">folder_shared</span> FAP/FAO
+
+                </button>
+
+                <button class="dash-tab" data-tab="config">
+
+                    <span class="material-icons">settings</span> Configuración
+
+                </button>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- Tab: Accesos (General Access Logs) -->
+
+        <section class="dash-panel" id="panel-accesos">
+
+            <div class="panel-header">
+
+                <h2>Accesos del Día</h2>
+
+                <div class="panel-filters">
+
+                    <input type="text" id="filterAccesoDni" placeholder="Buscar DNI o Nombre..." class="dash-input">
+
+                    <select id="filterAccesoResultado" class="dash-select">
+
+                        <option value="">Todos los resultados</option>
+
+                        <option value="AUTORIZADO">Autorizado</option>
+
+                        <option value="DENEGADO">Denegado</option>
+
+                        <option value="REGISTRADO">Registrado</option>
+
+                    </select>
+
+                </div>
+
+            </div>
+
+            <div class="table-wrapper">
+
+                <table class="dash-table" id="tablaAccesos">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>Hora</th>
+
+                            <th>DNI</th>
+
+                            <th>Nombre</th>
+
+                            <th>Evento</th>
+
+                            <th>Permiso</th>
+
+                            <th>Local/Empresa</th>
+
+                            <th>Resultado</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="bodyAccesos">
+
+                        <tr><td colspan="7" class="empty-state">Cargando accesos...</td></tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- Tab: Fichajes -->
+
+        <section class="dash-panel hidden" id="panel-fichajes">
+
+            <div class="panel-header">
+
+                <h2>Fichajes — Hoy</h2>
+
+                <div class="panel-filters">
+
+                    <input type="text" id="filterFichajeDni" placeholder="Filtrar por DNI..." class="dash-input">
+
+                </div>
+
+            </div>
+
+            <div class="table-wrapper">
+
+                <table class="dash-table" id="tablaFichajes">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>DNI</th>
+
+                            <th>Nombre</th>
+
+                            <th>Categoría</th>
+
+                            <th>Puesto Espec.</th>
+
+                            <th>Entrada</th>
+
+                            <th>Salida</th>
+
+                            <th>Hs Diurnas</th>
+
+                            <th>Hs Nocturnas</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="bodyFichajes">
+
+                        <tr><td colspan="6" class="empty-state">Cargando fichajes...</td></tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- Tab: Personas adentro -->
+
+        <section class="dash-panel hidden" id="panel-adentro">
+
+            <div class="panel-header">
+
+                <h2>Personas dentro del predio ahora</h2>
+
+            </div>
+
+            <div class="personas-grid" id="personasAdentroGrid">
+
+                <p class="empty-state">Cargando...</p>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- Tab: Auditoría -->
+
+        <section class="dash-panel hidden" id="panel-auditoria">
+
+            <div class="panel-header">
+
+                <h2>Auditoría por Período</h2>
+
+                <div class="panel-filters audit-filters">
+
+                    <div class="filter-group">
+
+                        <label>Desde</label>
+
+                        <input type="date" id="auditDesde" class="dash-input">
+
+                    </div>
+
+                    <div class="filter-group">
+
+                        <label>Hasta</label>
+
+                        <input type="date" id="auditHasta" class="dash-input">
+
+                    </div>
+
+                    <div class="filter-group">
+
+                        <label>Tipo</label>
+
+                        <select id="auditTipo" class="dash-select">
+
+                            <option value="accesos">Accesos</option>
+
+                            <option value="fichajes">Fichajes</option>
+
+                        </select>
+
+                    </div>
+
+                    <button class="dash-btn dash-btn-primary" id="btnBuscarAudit">
+
+                        <span class="material-icons">search</span> Buscar
+
+                    </button>
+
+                    <button class="dash-btn dash-btn-success" id="btnExportarAudit">
+
+                        <span class="material-icons">download</span> Exportar Excel
+
+                    </button>
+
+                </div>
+
+            </div>
+
+            <div id="auditResultInfo" class="audit-result-info" style="display:none;"></div>
+
+            <div class="table-wrapper">
+
+                <table class="dash-table" id="tablaAuditoria">
+
+                    <thead id="headAuditoria">
+
+                        <tr><th colspan="7" class="empty-state">Seleccioná un rango de fechas y hacé clic en "Buscar"</th></tr>
+
+                    </thead>
+
+                    <tbody id="bodyAuditoria"></tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- Tab: Directorio / Nóminas -->
+
+        <section class="dash-panel hidden" id="panel-directorio">
+
+            <div class="panel-header">
+
+                <h2>Directorio de Personal Autorizado</h2>
+
+                <div class="panel-filters">
+
+                    <input type="text" id="filterDirectorio" placeholder="Buscar por DNI o Nombre..." class="dash-input">
+
+                    <select id="filterDirectorioTipo" class="dash-select">
+
+                        <option value="TODOS">Todos los tipos</option>
+
+                        <option value="FAO">FAO</option>
+
+                        <option value="FAP">FAP</option>
+
+                        <option value="NOMINA">Nómina</option>
+
+                    </select>
+
+                    <button class="dash-btn dash-btn-outline" onclick="loadDirectorioIrsa()">
+
+                        <span class="material-icons">refresh</span> Actualizar
+
+                    </button>
+
+                </div>
+
+            </div>
+
+            <div class="table-wrapper">
+
+                <table class="dash-table" id="tablaDirectorio">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>DNI</th>
+
+                            <th>Nombre</th>
+
+                            <th>Empresa / Local</th>
+
+                            <th>Tipo</th>
+
+                            <th>Nro. Trámite</th>
+
+                            <th>Vence</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="bodyDirectorio">
+
+                        <tr><td colspan="6" class="empty-state">Cargando directorio...</td></tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- Tab: Trámites FAP/FAO -->
+
+        <section class="dash-panel hidden" id="panel-tramites">
+
+            <div class="panel-header">
+
+                <h2>Trámites IRSA — FAPs y FAOs</h2>
+
+                <div class="panel-filters">
+
+                    <input type="text" id="filterTramites" placeholder="Buscar por empresa o ID..." class="dash-input">
+
+                    <select id="filterTramiteTipo" class="dash-select" style="display:none;">
+
+                        <option value="">Todos</option>
+
+                        <option value="FAO">Solo FAO</option>
+
+                        <option value="FAP">Solo FAP</option>
+
+                    </select>
+
+                    <select id="filterTramitesEstado" class="dash-select">
+
+                        <option value="TODOS">Todos los estados</option>
+
+                        <option value="6">Aprobado</option>
+
+                        <option value="4">Aprobado Parcial</option>
+
+                        <option value="3">Enviado</option>
+
+                        <option value="5">Requiere Cambios</option>
+
+                    </select>
+
+                    <button class="dash-btn dash-btn-outline" onclick="loadTramitesIRSA()">
+
+                        <span class="material-icons">refresh</span> Actualizar
+
+                    </button>
+
+                </div>
+
+            </div>
+
+            <div class="table-wrapper">
+
+                <table class="dash-table" id="tablaTramites">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>Tipo</th>
+
+                            <th>ID</th>
+
+                            <th>Empresa</th>
+
+                            <th>Fecha Inicio</th>
+
+                            <th>Fecha Fin</th>
+
+                            <th>Estado</th>
+
+                            <th>Trabajadores</th>
+
+                            <th>Detalle</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="bodyTramites">
+
+                        <tr><td colspan="8" class="empty-state">Cargando trámites...</td></tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- Tab: Configuración -->
+
+        <section class="dash-panel hidden" id="panel-config" style="flex: none; min-height: auto; overflow: visible;">
+
+            <div class="panel-header" style="flex-shrink: 0;">
+
+                <h2>Configuración del Sistema</h2>
+
+            </div>
+
+            <div class="config-content" style="padding: 2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start;">
+
+                
+
+                <!-- Columna Izquierda -->
+
+                <div style="display: flex; flex-direction: column; gap: 2rem;">
+
+                    <!-- Sincronizacion IRSA -->
+
+                    <div class="config-card" style="background: var(--dash-surface-hover); padding: 1.5rem; border-radius: var(--dash-radius); border: 1px solid var(--dash-border);">
+
+                        <h3 style="margin-bottom: 1rem; color: var(--dash-primary); display: flex; align-items: center; gap: 0.5rem;">
+
+                            <span class="material-icons">cloud_sync</span> Sincronización IRSA (FAOs y FAPs)
+
+                        </h3>
+
+                        <p style="font-size: 0.85rem; color: var(--dash-text-muted); margin-bottom: 1.5rem;">
+
+                            El sistema se conecta automáticamente cada 4 horas. Para que esto funcione, debe ingresar las credenciales del portal Locatarios de IRSA.
+
+                        </p>
+
+                        
+
+                        <div style="display: flex; flex-direction: column; gap: 1rem;">
+
+                            <div class="filter-group">
+
+                                <label>Usuario IRSA</label>
+
+                                <input type="text" id="irsaUser" class="dash-input" placeholder="ej: supervisor_oeste">
+
+                            </div>
+
+                            <div class="filter-group">
+
+                                <label>Contraseña IRSA</label>
+
+                                <input type="password" id="irsaPass" class="dash-input" placeholder="Ingresar solo si desea actualizarla">
+
+                            </div>
+
+                            <div class="filter-group">
+
+                                <label>Días de Alerta Previa al Vencimiento</label>
+
+                                <input type="number" id="irsaDiasAlerta" class="dash-input" placeholder="Ej: 5" value="0">
+
+                            </div>
+
+                            
+
+                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--dash-border); padding-bottom: 0.5rem;">
+
+                                <span>Estado Credenciales:</span>
+
+                                <span id="irsaHasCreds" style="font-weight: 600;">Comprobando...</span>
+
+                            </div>
+
+                            <div style="display: flex; justify-content: space-between; padding-top: 0.5rem;">
+
+                                <span>Última Sincronización:</span>
+
+                                <span id="irsaLastSyncTime" style="font-weight: 600;">...</span>
+
+                            </div>
+
+                        </div>
+
+                        <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+
+                            <button id="btnSaveIrsa" onclick="saveIrsaConfig()" class="dash-btn dash-btn-primary" style="flex: 1;"><span class="material-icons">save</span> Guardar Credenciales</button>
+
+                            <button id="btnSyncIrsa" onclick="syncIrsa()" class="dash-btn dash-btn-outline" style="flex: 1;"><span class="material-icons">sync</span> Sincronizar Ahora</button>
+
+                        </div>
+
+                        <p id="irsaStatusMsg" style="font-size: 0.85rem; margin-top: 1rem; display: none; font-weight: 500; text-align: center;"></p>
+
+                    </div>
+
+
+
+                    <!-- ABM Puestos Fisicos -->
+
+                    <div class="config-card" style="background: var(--dash-surface-hover); padding: 1.5rem; border-radius: var(--dash-radius); border: 1px solid var(--dash-border);">
+
+                        <h3 style="margin-bottom: 1rem; color: var(--dash-primary); display: flex; align-items: center; gap: 0.5rem;">
+
+                            <span class="material-icons">place</span> Puestos Físicos (Para Fichaje)
+
+                        </h3>
+
+                        <p style="color: var(--dash-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Cree los puestos (ej. Garita 1) para asignarle al personal al momento de fichar.</p>
+
+                        
+
+                        <form id="formPuestosFisicos" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem;">
+
+                            <input type="text" id="nuevoPuestoFisicoNombre" class="dash-input" placeholder="Nombre (Ej: Garita 1)" required>
+
+                            <select id="nuevoPuestoFisicoSector" class="dash-select" required>
+
+                                <option value="">Seleccionar Sector...</option>
+
+                                <option value="Mall">Mall</option>
+
+                                <option value="Cocheras">Cocheras</option>
+
+                                <option value="Eventos">Eventos</option>
+
+                            </select>
+
+                            <div style="display: flex; gap: 0.5rem;">
+
+                                <input type="time" id="nuevoPuestoFisicoInicio" class="dash-input" title="Hora Inicio">
+
+                                <input type="time" id="nuevoPuestoFisicoFin" class="dash-input" title="Hora Fin">
+
+                            </div>
+
+                            <button type="submit" class="dash-btn dash-btn-primary"><span class="material-icons">add</span> Agregar Puesto</button>
+
+                        </form>
+
+                        
+
+                        <div style="background: var(--dash-bg); border-radius: var(--dash-radius-sm); border: 1px solid var(--dash-border); padding: 1rem; max-height: 250px; overflow-y: auto;">
+
+                            <ul id="listaPuestosFisicos" style="list-style: none; display: flex; flex-direction: column; gap: 0.5rem;">
+
+                                <li style="color: var(--dash-text-muted); text-align: center; font-size: 0.85rem;">Cargando...</li>
+
+                            </ul>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- Columna Derecha -->
+
+                <div style="display: flex; flex-direction: column; gap: 2rem;">
+
+                    <!-- ABM Empresas -->
+
+                    <div class="config-card" style="background: var(--dash-surface-hover); padding: 1.5rem; border-radius: var(--dash-radius); border: 1px solid var(--dash-border);">
+
+                        <h3 style="margin-bottom: 1rem; color: var(--dash-primary); display: flex; align-items: center; gap: 0.5rem;">
+
+                            <span class="material-icons">business</span> Empresas Contratistas
+
+                        </h3>
+
+                        <p style="color: var(--dash-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Administre las empresas proveedoras de servicios tercerizados.</p>
+
+                        
+
+                        <form id="formEmpresas" style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
+
+                            <input type="text" id="nuevaEmpresaNombre" class="dash-input" placeholder="Nombre de Empresa..." required style="flex-grow: 1;">
+
+                            <button type="submit" class="dash-btn dash-btn-primary"><span class="material-icons">add</span> Agregar</button>
+
+                        </form>
+
+                        
+
+                        <div style="background: var(--dash-bg); border-radius: var(--dash-radius-sm); border: 1px solid var(--dash-border); padding: 1rem; max-height: 250px; overflow-y: auto;">
+
+                            <ul id="listaEmpresas" style="list-style: none; display: flex; flex-direction: column; gap: 0.5rem;">
+
+                                <li style="color: var(--dash-text-muted); text-align: center; font-size: 0.85rem;">Cargando...</li>
+
+                            </ul>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Lista Negra -->
+
+                    <div class="config-card" style="background: var(--dash-surface-hover); padding: 1.5rem; border-radius: var(--dash-radius); border: 1px solid #ff3b30;">
+
+                        <h3 style="margin-bottom: 1rem; color: #ff3b30; display: flex; align-items: center; gap: 0.5rem;">
+
+                            <span class="material-icons">gavel</span> Lista Negra (Personas de Interés)
+
+                        </h3>
+
+                        <form id="formListaNegra" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem;">
+
+                            <input type="text" id="lnDni" class="dash-input" placeholder="DNI exacto..." required>
+
+                            <input type="text" id="lnMotivo" class="dash-input" placeholder="Motivo o antecedente..." required>
+
+                            <button type="submit" class="dash-btn" style="background: #ff3b30; color: white; border: none;"><span class="material-icons">add_circle</span> Bloquear Persona</button>
+
+                        </form>
+
+                        <div style="background: var(--dash-bg); border-radius: var(--dash-radius-sm); border: 1px solid var(--dash-border); padding: 1rem;">
+
+                            <ul id="ulListaNegra" style="list-style: none; display: flex; flex-direction: column; gap: 0.5rem;"></ul>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Respaldo de Base de Datos -->
+
+                    <div class="config-card" style="background: var(--dash-surface-hover); padding: 1.5rem; border-radius: var(--dash-radius); border: 1px solid var(--dash-border);">
+
+                        <h3 style="margin-bottom: 1rem; color: var(--dash-primary); display: flex; align-items: center; gap: 0.5rem;">
+
+                            <span class="material-icons">save</span> Respaldo de Base de Datos
+
+                        </h3>
+
+                        <p style="color: var(--dash-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Generar y descargar una copia de seguridad local.</p>
+
+                        <button class="dash-btn dash-btn-primary" onclick="descargarBackup()" style="width: 100%;">
+
+                            <span class="material-icons">download</span> Descargar Backup Completo
+
+                        </button>
+
+                        <p id="backupStatusMsg" style="font-size: 0.85rem; margin-top: 1rem; display: none; font-weight: 500;"></p>
+
+                    </div>
+
+                </div>
+
+
+
+            </div>
+
+        </section>
+
+
+
+<style>
+
+/* Estilos Premium para el ABM Modal */
+
+.abm-modal-content {
+
+    max-width: 900px;
+
+    width: 95%;
+
+}
+
+
+
+.abm-columns {
+
+    display: grid;
+
+    grid-template-columns: 1fr 1fr;
+
+    gap: 2rem;
+
+    margin-bottom: 2rem;
+
+}
+
+
+
+.mb-3 {
+
+    margin-bottom: 1.25rem;
+
+}
+
+
+
+.abm-section-title {
+
+    font-size: 1.1rem;
+
+    font-weight: 600;
+
+    margin-bottom: 1.5rem;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 0.5rem;
+
+    color: var(--dash-primary);
+
+    border-bottom: 1px solid var(--dash-border);
+
+    padding-bottom: 0.5rem;
+
+}
+
+
+
+/* Biometría Card */
+
+.bio-column {
+
+    display: flex;
+
+    flex-direction: column;
+
+}
+
+
+
+.bio-status-card {
+
+    background: var(--dash-surface-hover);
+
+    border: 1px dashed var(--dash-border);
+
+    border-radius: var(--dash-radius);
+
+    padding: 1.5rem;
+
+    text-align: center;
+
+    margin-bottom: 1rem;
+
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+
+    justify-content: center;
+
+    transition: var(--dash-transition);
+
+}
+
+
+
+.bio-status-card.success {
+
+    border-color: var(--dash-success);
+
+    background: var(--dash-success-glow);
+
+}
+
+
+
+.bio-icon-container {
+
+    width: 60px;
+
+    height: 60px;
+
+    border-radius: 50%;
+
+    background: rgba(255,255,255,0.05);
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    margin-bottom: 0.5rem;
+
+}
+
+
+
+.bio-icon {
+
+    font-size: 2.5rem;
+
+    color: var(--dash-text-muted);
+
+}
+
+
+
+.bio-status-card.success .bio-icon {
+
+    color: var(--dash-success);
+
+}
+
+
+
+.bio-btn {
+
+    width: 100%;
+
+    display: flex;
+
+    justify-content: center;
+
+    align-items: center;
+
+    gap: 0.5rem;
+
+    font-size: 1.1rem;
+
+    padding: 0.75rem;
+
+}
+
+
+
+.abm-actions {
+
+    display: flex;
+
+    justify-content: flex-end;
+
+    gap: 1rem;
+
+    border-top: 1px solid var(--dash-border);
+
+    padding-top: 1.5rem;
+
+}
+
+
+
+.dash-text-muted {
+
+    color: var(--dash-text-muted);
+
+    font-size: 0.85rem;
+
+    margin-top: 0.25rem;
+
+    display: block;
+
+}
+
+</style>
+
+
+
+
+
+    <script src="{{ url_for('static', filename='dashboard.js') }}?v=3.0"></script>
+
+    <script src="{{ url_for('static', filename='sse_alert_snippet.js') }}?v=3.0"></script>
+
+{% include 'nomina_modal_snippet.html' %}
+    <script src="{{ url_for('static', filename='nomina_logic_snippet.js') }}"></script>
+</body>
+
+</html>
+

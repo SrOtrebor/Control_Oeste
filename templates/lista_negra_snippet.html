@@ -1,0 +1,41 @@
+                <!-- Panel Lista Negra -->
+                <div class="config-card" style="background: var(--dash-surface-hover); padding: 1.5rem; border-radius: var(--dash-radius); border: 1px solid #ff3b30; margin-top: 2rem;">
+                    <h3 style="margin-bottom: 1rem; color: #ff3b30; display: flex; align-items: center; gap: 0.5rem;">
+                        <span class="material-icons">gavel</span> Lista Negra (Personas de Interés)
+                    </h3>
+                    <p style="font-size: 0.85rem; color: var(--dash-text-muted); margin-bottom: 1.5rem;">
+                        Cualquier persona cargada aquí disparará una alerta inmediata y silenciosa en este panel si intenta ingresar, incluso si su DNI es autorizado por algún otro permiso.
+                    </p>
+                    
+                    <form id="formListaNegra" style="display: flex; gap: 1rem; align-items: flex-end; margin-bottom: 1.5rem;">
+                        <div class="filter-group" style="flex: 1;">
+                            <label>DNI</label>
+                            <input type="text" id="lnDni" class="dash-input" required placeholder="Sin puntos">
+                        </div>
+                        <div class="filter-group" style="flex: 1.5;">
+                            <label>Nombre</label>
+                            <input type="text" id="lnNombre" class="dash-input" placeholder="Opcional">
+                        </div>
+                        <div class="filter-group" style="flex: 2;">
+                            <label>Motivo</label>
+                            <input type="text" id="lnMotivo" class="dash-input" required placeholder="Ej: Merodeador, Suspendido...">
+                        </div>
+                        <button type="submit" class="dash-btn dash-btn-danger">Agregar</button>
+                    </form>
+                    
+                    <div class="table-wrapper">
+                        <table class="dash-table" id="tablaListaNegra">
+                            <thead>
+                                <tr>
+                                    <th>DNI</th>
+                                    <th>Nombre</th>
+                                    <th>Motivo</th>
+                                    <th>Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bodyListaNegra">
+                                <tr><td colspan="4" class="empty-state">Cargando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>

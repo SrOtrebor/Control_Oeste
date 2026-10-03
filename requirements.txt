@@ -5,3 +5,5 @@ Flask
 pywebview
 python-dotenv
 pytest
+cryptography
+requests

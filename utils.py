@@ -12,11 +12,12 @@ import shutil
 from datetime import datetime
 import pandas as pd
 from logger_config import get_logger
+from config import BASE_DIR
 
 logger = get_logger(__name__)
 
 # Directorio de backups
-BACKUPS_DIR = os.path.join(os.path.dirname(__file__), 'backups')
+BACKUPS_DIR = os.path.join(BASE_DIR, 'backups')
 os.makedirs(BACKUPS_DIR, exist_ok=True)
 
 
@@ -225,15 +226,11 @@ def validar_dni(dni_str):
     if not dni_str:
         return False
     
-    # Limpiar DNI
-    dni_limpio = re.sub(r'[^\d]', '', str(dni_str))
+    # Limpiar posibles espacios o puntos
+    dni_limpio = str(dni_str).strip().replace('.', '')
     
-    # Verificar longitud (7 u 8 dígitos)
-    if len(dni_limpio) < 7 or len(dni_limpio) > 8:
-        return False
-    
-    # Verificar que sean solo dígitos
-    return dni_limpio.isdigit()
+    # Verificar longitud (7 u 8 dígitos) y que sean estrictamente numéricos
+    return bool(re.match(r'^\d{7,8}$', dni_limpio))
 
 
 def validar_fecha(fecha_str):

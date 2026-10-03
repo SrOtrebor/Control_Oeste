@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Maestro - Super Admin</title>
+    <!-- Google Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="css/maestro.css">
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <span class="material-icons">admin_panel_settings</span>
+            <h2>Super Admin</h2>
+        </div>
+        <ul class="nav-links">
+            <li class="active"><a href="#"><span class="material-icons">business</span> Centros Comerciales</a></li>
+            <li><a href="#"><span class="material-icons">manage_accounts</span> Usuarios Globales</a></li>
+            <li><a href="#"><span class="material-icons">settings</span> Configuración</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <button id="btnLogout" class="btn-logout">
+                <span class="material-icons">logout</span> Cerrar Sesión
+            </button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <header>
+            <div>
+                <h1>Dashboard Maestro</h1>
+                <p>Bienvenido, <span id="adminName">Cargando...</span></p>
+            </div>
+            <div class="header-actions">
+                <button class="btn-primary" id="btnNewCentro">
+                    <span class="material-icons">add</span> Nuevo Centro
+                </button>
+            </div>
+        </header>
+
+        <section class="cards-grid">
+            <div class="stat-card">
+                <div class="stat-icon"><span class="material-icons">storefront</span></div>
+                <div class="stat-info">
+                    <h3>Centros Activos</h3>
+                    <h2>1</h2>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><span class="material-icons">group</span></div>
+                <div class="stat-info">
+                    <h3>Usuarios Totales</h3>
+                    <h2>1</h2>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Centros Comerciales Instalados</h2>
+            <div class="table-container">
+                <table class="dash-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre</th>
+                            <th>Usuarios</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="centrosTableBody">
+                        <tr>
+                            <td>oeste</td>
+                            <td>Centro Comercial Oeste</td>
+                            <td>1</td>
+                            <td><span class="badge badge-success">Activo</span></td>
+                            <td>
+                                <button class="btn-icon"><span class="material-icons">edit</span></button>
+                                <button class="btn-icon" onclick="window.location.href='/dashboard.html'"><span class="material-icons">login</span></button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBg0ht9KWgGrhGmHkT7mzCRgJ2CS6e4-lQ",
+            authDomain: "control-acceso-c2f82.firebaseapp.com",
+            projectId: "control-acceso-c2f82",
+            storageBucket: "control-acceso-c2f82.firebasestorage.app",
+            messagingSenderId: "654089830879",
+            appId: "1:654089830879:web:96b5a40c8fc6292422446a"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                const docRef = doc(db, "usuarios", user.uid);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists() && docSnap.data().rol === 'super_admin') {
+                    document.getElementById('adminName').textContent = docSnap.data().nombre;
+                } else {
+                    window.location.href = '/';
+                }
+            } else {
+                window.location.href = '/';
+            }
+        });
+
+        document.getElementById('btnLogout').addEventListener('click', () => {
+            signOut(auth);
+        });
+    </script>
+</body>
+</html>
