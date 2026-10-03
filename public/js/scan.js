@@ -74,7 +74,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function setupCacheListeners() {
         onSnapshot(collection(db, "nominas"), (snapshot) => {
             localNominas.clear();
-            snapshot.forEach(doc => localNominas.set(doc.id, doc.data()));
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                localNominas.set(data.dni || doc.id, data);
+            });
         });
         onSnapshot(collection(db, "lista_negra"), (snapshot) => {
             localListaNegra.clear();
@@ -171,6 +174,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Configurar Listeners en tiempo real para Stats y Tabla Diaria
     function setupRealtimeListeners() {
+        // Escuchar estadísticas en vivo para Total Adentro
+        onSnapshot(doc(db, "config", "live_stats"), (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                if (data && data.total_adentro !== undefined) {
+                    const el = document.getElementById('statTotalAdentro');
+                    if (el) el.textContent = data.total_adentro;
+                }
+            }
+        });
+
         const today = getTodayString();
         const q = query(collection(db, "accesos"), where("Fecha", "==", today));
         
@@ -274,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let empData = localNominas.get(parsed.dni);
             if (!empData) {
                 for (const [key, value] of localNominas.entries()) {
-                    if (key.length >= 10 && key.includes(parsed.dni)) {
+                    if ((key && key.includes(parsed.dni)) || (value.dni && value.dni.includes(parsed.dni))) {
                         empData = value;
                         break;
                     }
