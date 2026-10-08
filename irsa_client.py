@@ -170,10 +170,14 @@ class IRSAClient:
         for fao in faos_data:
             fao_id = fao.get('id', '')
             marca = fao.get('marca', '')
-            local = fao.get('local', '')
+            local = fao.get('lugarTrabajo', '')
             # Asumimos que las fechas vienen en formato ISO
-            fecha_inicio = fao.get('fechaDesde', '').split('T')[0] if fao.get('fechaDesde') else ''
-            fecha_fin = fao.get('fechaHasta', '').split('T')[0] if fao.get('fechaHasta') else ''
+            fecha_inicio = fao.get('fechaInicio', '').split('T')[0] if fao.get('fechaInicio') else ''
+            fecha_fin = fao.get('fechaFin', '').split('T')[0] if fao.get('fechaFin') else ''
+            
+            h_ini = fao.get('horaInicio', '')
+            h_fin = fao.get('horaFin', '')
+            horario = f"{h_ini[:5]} a {h_fin[:5]}" if h_ini and h_fin else ''
             
             personal = fao.get('personal', [])
             for p in personal:
@@ -186,16 +190,16 @@ class IRSAClient:
                     'Local': local,
                     'Fecha Inicio': fecha_inicio,
                     'Fecha Fin': fecha_fin,
-                    'Shopping': fao.get('shoppingNombre', 'AL OESTE SHOPPING'),
+                    'Shopping': fao.get('shopping', 'AL OESTE SHOPPING'),
                     'Tipo': fao.get('tipo', 'MANTENIMIENTO'),
-                    'Numero': p.get('nroDocumento', ''),
+                    'Numero': p.get('numeroDocumento', ''),
                     'Nombre': p.get('nombre', ''),
                     'Apellido': p.get('apellido', ''),
-                    'Horario': fao.get('horario', ''),
-                    'Lugar': fao.get('lugar', ''),
-                    'Tarea/s': fao.get('tareas', ''),
+                    'Horario': horario,
+                    'Lugar': fao.get('lugarTrabajo', ''),
+                    'Tarea/s': fao.get('detalleTrabajo', ''),
                     'Tipo.1': p.get('tipoDocumento', 'DNI'),
-                    'Locatario/Proveedor': fao.get('proveedor', ''),
+                    'Locatario/Proveedor': fao.get('usuario', ''),
                     'Area Solicitante': fao.get('area', ''),
                     'Aprobacion automatica': 'SI'
                 })
@@ -222,9 +226,9 @@ class IRSAClient:
         for fap in faps_data:
             fap_id = fap.get('id', '')
             marca = fap.get('marca', '')
-            local = fap.get('local', '')
-            fecha_inicio = fap.get('fechaDesde', '').split('T')[0] if fap.get('fechaDesde') else ''
-            fecha_fin = fap.get('fechaHasta', '').split('T')[0] if fap.get('fechaHasta') else ''
+            local = fap.get('lugarTrabajo', '')
+            fecha_inicio = fap.get('fechaInicio', '').split('T')[0] if fap.get('fechaInicio') else ''
+            fecha_fin = fap.get('fechaFin', '').split('T')[0] if fap.get('fechaFin') else ''
             
             personal = fap.get('personal', [])
             for p in personal:
@@ -237,9 +241,9 @@ class IRSAClient:
                     'Local': local,
                     'Fecha Inicio': fecha_inicio,
                     'Fecha Fin': fecha_fin,
-                    'Shopping': fap.get('shoppingNombre', 'AL OESTE SHOPPING'),
+                    'Shopping': fap.get('shopping', 'AL OESTE SHOPPING'),
                     'Tipo': 'INGRESO',
-                    'Numero': p.get('nroDocumento', ''),
+                    'Numero': p.get('numeroDocumento', ''),
                     'Nombre': p.get('nombre', ''),
                     'Apellido': p.get('apellido', '')
                 })
