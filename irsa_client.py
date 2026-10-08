@@ -123,6 +123,7 @@ class IRSAClient:
             if detalle:
                 faos_data.append(detalle)
             time.sleep(0.1) # Pausa amigable
+        self._validar_descarga("FAOs", len(fao_ids), len(faos_data))
             
         # 2. Obtener FAPs
         fap_ids = self._listar_tramites("/api/faps/listar", shopping_id)
@@ -132,6 +133,7 @@ class IRSAClient:
             if detalle:
                 faps_data.append(detalle)
             time.sleep(0.1)
+        self._validar_descarga("FAPs", len(fap_ids), len(faps_data))
 
         hoy_str = datetime.now().strftime('%Y-%m-%d')
         def is_not_expired(item):
@@ -160,6 +162,16 @@ class IRSAClient:
         
         logger.info("Sincronización IRSA finalizada exitosamente")
         return {"faos_procesados": len(faos_validos), "faps_procesados": len(faps_validos)}
+
+    @staticmethod
+    def _validar_descarga(nombre, total, obtenidos):
+        """Evita pisar los datos locales (offline-first) con una descarga incompleta
+        (por ejemplo, si se cortó internet a mitad de la sincronización)."""
+        if total > 0 and obtenidos < total * 0.9:
+            raise IRSASyncError(
+                f"Descarga incompleta de {nombre}: {obtenidos}/{total}. "
+                f"Se conservan los datos locales anteriores."
+            )
 
     def _guardar_excel_faos(self, faos_data):
         """Convierte los datos JSON de FAOs al formato Excel local"""
