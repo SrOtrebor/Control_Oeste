@@ -62,6 +62,7 @@ def init_db():
                 nombre TEXT,
                 evento TEXT,            -- 'ENTRADA', 'SALIDA', 'RECHAZO'
                 tipo_permiso TEXT,
+                num_permiso TEXT,
                 local TEXT,
                 resultado TEXT,         -- 'AUTORIZADO', 'DENEGADO'
                 motivo_rechazo TEXT,

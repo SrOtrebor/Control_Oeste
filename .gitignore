@@ -86,4 +86,5 @@ Desktop.ini
 # Estado local del obrero Firebase
 firestore_sync_cache.json
 firestore_sync_cache.json.tmp
+serviceAccountKey.json
 

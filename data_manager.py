@@ -14,6 +14,7 @@ from config import (
     COL_DNI_FAO_ORIGINAL, COL_NOMBRE_FAO_ORIGINAL, COL_APELLIDO_FAO_ORIGINAL, COL_NUM_PERMISO_FAO_ORIGINAL, COL_VENCE_FAO_ORIGINAL, COL_LOCAL_FAO_ORIGINAL, COL_TAREA_FAO_ORIGINAL
 )
 from logger_config import get_logger
+from utils import limpiar_dni, normalizar_fecha_vencimiento
 
 # Logger para este módulo
 logger = get_logger(__name__)
@@ -597,14 +598,17 @@ def obtener_directorio_irsa():
                     for p in f.get('personal', []):
                         if p.get('activo'):
                             nombre_completo = f"{p.get('nombre', '').strip()} {p.get('apellido', '').strip()}".strip()
-                            directorio.append({
-                                'dni': str(p.get('numeroDocumento', '')),
-                                'nombre': nombre_completo,
-                                'empresa': empresa,
-                                'vence': vence,
-                                'tipo': 'FAO',
-                                'numero': str(f.get('id', ''))
-                            })
+                            dni_cand = limpiar_dni(p.get('numeroDocumento', ''))
+                            if dni_cand:
+                                directorio.append({
+                                    'dni': dni_cand,
+                                    'nombre': nombre_completo,
+                                    'empresa': empresa,
+                                    'tarea': 'Trabajos Generales',
+                                    'vence': vence,
+                                    'tipo': 'FAO',
+                                    'numero': str(f.get('id', ''))
+                                })
     except Exception as e:
         logger.error(f"Error parseando directorio FAO JSON: {e}")
 
@@ -630,14 +634,17 @@ def obtener_directorio_irsa():
                     for p in f.get('personal', []):
                         if p.get('activo'):
                             nombre_completo = f"{p.get('nombre', '').strip()} {p.get('apellido', '').strip()}".strip()
-                            directorio.append({
-                                'dni': str(p.get('numeroDocumento', '')),
-                                'nombre': nombre_completo,
-                                'empresa': empresa,
-                                'vence': vence,
-                                'tipo': 'FAP',
-                                'numero': str(f.get('id', ''))
-                            })
+                            dni_cand = limpiar_dni(p.get('numeroDocumento', ''))
+                            if dni_cand:
+                                directorio.append({
+                                    'dni': dni_cand,
+                                    'nombre': nombre_completo,
+                                    'empresa': empresa,
+                                    'tarea': 'Trabajos Generales',
+                                    'vence': vence,
+                                    'tipo': 'FAP',
+                                    'numero': str(f.get('id', ''))
+                                })
     except Exception as e:
         logger.error(f"Error parseando directorio FAP JSON: {e}")
 
@@ -648,23 +655,20 @@ def obtener_directorio_irsa():
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM autorizaciones WHERE activo = 1")
             for row in cursor.fetchall():
-                vence_local = row['fecha_fin'] if row['fecha_fin'] else ''
-                if vence_local:
-                    try:
-                        dt = datetime.strptime(vence_local, '%Y-%m-%d')
-                        vence_local = dt.strftime('%d/%m/%Y')
-                    except:
-                        pass
+                _, vence_local = normalizar_fecha_vencimiento(row['fecha_fin'])
                 
                 nombre_completo_local = f"{row['nombre'] or ''} {row['apellido'] or ''}".strip()
-                directorio.append({
-                    'dni': str(row['dni']),
-                    'nombre': nombre_completo_local,
-                    'empresa': row['local'] or 'N/A',
-                    'vence': vence_local,
-                    'tipo': row['tipo_permiso'] or 'LOCAL',
-                    'numero': str(row['num_permiso'] or '')
-                })
+                dni_local = limpiar_dni(row['dni'])
+                if dni_local:
+                    directorio.append({
+                        'dni': dni_local,
+                        'nombre': nombre_completo_local,
+                        'empresa': row['local'] or 'N/A',
+                        'tarea': row['tarea'] or row['categoria'] or 'Trabajos Generales',
+                        'vence': vence_local,
+                        'tipo': row['tipo_permiso'] or 'LOCAL',
+                        'numero': str(row['num_permiso'] or '')
+                    })
     except Exception as e:
         logger.error(f"Error obteniendo autorizaciones locales para directorio: {e}")
 

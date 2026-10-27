@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime
 import smtplib
 import shutil
@@ -64,6 +65,8 @@ from utils import (
     validar_archivo_fao,
     crear_backup,
     limpiar_backups_antiguos,
+    limpiar_dni,
+    normalizar_fecha_vencimiento,
 )
 
 
@@ -73,9 +76,15 @@ app = Flask(__name__)
 CORS(app) # Permitir llamadas locales desde Firebase Hosting
 app.secret_key = SECRET_KEY
 
-# Logger para este módulo
 logger = get_logger(__name__)
 
+@app.after_request
+def add_header(response):
+    # Evitar que el navegador cachee respuestas dinámicas (APIs y HTML)
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 # ================= SUPERVISOR DEL OBRERO FIREBASE =================
 # Mantiene vivo firebase_worker.py (comandos de la web: SYNC_IRSA, UPDATE_OTA, etc.).
@@ -172,40 +181,123 @@ def api_registrar_fichaje():
 
 @app.route('/get_daily_records')
 def get_daily_records():
-    fecha_actual_str = datetime.now().strftime('%Y-%m-%d')
-    nombre_archivo = os.path.join(REGISTROS_DIARIOS_DIR, f'registros_ingreso_{fecha_actual_str}.xlsx')
-
-    if not os.path.exists(nombre_archivo):
-        return jsonify({'success': True, 'records': [], 'message': 'No hay registros para hoy.'})
-
     try:
-        df = pd.read_excel(nombre_archivo).fillna('')
-        records = df.to_dict('records')
-        return jsonify({'success': True, 'records': records})
+        from db_queries import get_db_connection
+        hoy = datetime.now().strftime('%Y-%m-%d')
+        with get_db_connection() as conn:
+            c = conn.cursor()
+            c.execute("SELECT * FROM registros_accesos WHERE fecha = ? ORDER BY hora DESC", (hoy,))
+            db_records = c.fetchall()
+            
+            # Precargar vencimientos por DNI desde autorizaciones y directorio IRSA (priorizando vigentes)
+            venc_map = {}
+            try:
+                def actualizar_venc_map(dni_raw, f_raw):
+                    dk = limpiar_dni(dni_raw)
+                    if not dk or not f_raw:
+                        return
+                    dt_nueva, f_str = normalizar_fecha_vencimiento(f_raw)
+                    if not dt_nueva and f_str != 'Indefinido':
+                        return
+                    
+                    if dk not in venc_map:
+                        venc_map[dk] = (dt_nueva, f_str)
+                    else:
+                        dt_actual, _ = venc_map[dk]
+                        score_actual = datetime.max.date() if dt_actual is None else dt_actual
+                        score_nueva = datetime.max.date() if dt_nueva is None else dt_nueva
+                        if score_nueva > score_actual:
+                            venc_map[dk] = (dt_nueva, f_str)
+
+                for row_a in c.execute("SELECT dni, fecha_fin FROM autorizaciones WHERE activo = 1 AND fecha_fin IS NOT NULL AND fecha_fin != ''").fetchall():
+                    actualizar_venc_map(row_a['dni'], row_a['fecha_fin'])
+                    
+                for p in data_manager.obtener_directorio_irsa():
+                    actualizar_venc_map(p.get('dni'), p.get('vence'))
+
+                venc_map_str = {k: v[1] for k, v in venc_map.items()}
+            except Exception as e:
+                logger.error(f"Error precargando venc_map: {e}")
+                venc_map_str = {}
+
+            from access_manager import calcular_dias_vencimiento
+
+            # Formatear para que el frontend del escaner lo entienda como Excel originalmente
+            records = []
+            for r in db_records:
+                num_permiso_val = r['num_permiso'] if 'num_permiso' in r.keys() and r['num_permiso'] else ""
+                if num_permiso_val and num_permiso_val != 'N/A' and num_permiso_val != 'None':
+                    num_permiso_str = num_permiso_val
+                else:
+                    num_permiso_str = r['tipo_permiso'] # Fallback
+                
+                dni_clean = limpiar_dni(r['dni'])
+                venc_val = venc_map_str.get(dni_clean, '')
+
+                dias_rest = calcular_dias_vencimiento(venc_val)
+                alerta_venc = (dias_rest is not None and 0 <= dias_rest <= 5)
+                
+                records.append({
+                    'DNI': r['dni'],
+                    'Nombre y Apellido': r['nombre'],
+                    'Hora_Ingreso': f"{r['fecha']} {r['hora']}" if 'ENTRADA' in r['evento'] else '',
+                    'Hora_Salida': f"{r['fecha']} {r['hora']}" if 'SALIDA' in r['evento'] else '',
+                    'Evento': r['evento'],
+                    'Tipo_Permiso': r['tipo_permiso'],
+                    'Num_Permiso': num_permiso_str,
+                    'Local': r['local'],
+                    'Resultado': r['resultado'],
+                    'Vence': venc_val,
+                    'Alerta_Vencimiento': alerta_venc,
+                    'Dias_Para_Vencer': dias_rest
+                })
+            
+            if not records:
+                return jsonify({'success': True, 'records': [], 'message': 'No hay registros para hoy.'})
+                
+            return jsonify({'success': True, 'records': records})
     except Exception as e:
+        logger.error(f"Error al leer registros para get_daily_records: {e}")
         return jsonify({'success': False, 'message': f'Error al leer registros: {e}'}), 500
 
 @app.route('/get_dynamic_stats')
 def get_dynamic_stats():
-    fecha_actual_str = datetime.now().strftime('%Y-%m-%d')
-    nombre_archivo = os.path.join(REGISTROS_DIARIOS_DIR, f'registros_ingreso_{fecha_actual_str}.xlsx')
-    
-    permitidos = 0
-    rechazados = 0
-
-    if os.path.exists(nombre_archivo):
-        try:
-            df = pd.read_excel(nombre_archivo)
-            permitidos = df[df['Resultado'] == 'VERDE'].shape[0]
-            rechazados = df[df['Resultado'] == 'ROJO'].shape[0]
-        except Exception:
-            pass 
-
-    return jsonify({
-        'total_adentro': len(personas_adentro),
-        'permitidos': permitidos,
-        'rechazados': rechazados
-    })
+    try:
+        from db_queries import get_db_connection
+        hoy = datetime.now().strftime('%Y-%m-%d')
+        with get_db_connection() as conn:
+            c = conn.cursor()
+            
+            c.execute("SELECT COUNT(*) as c FROM estado_adentro")
+            adentro = c.fetchone()['c']
+            
+            c.execute("SELECT COUNT(*) as c FROM registros_accesos WHERE fecha = ? AND evento = 'ENTRADA'", (hoy,))
+            entradas = c.fetchone()['c']
+            
+            c.execute("SELECT COUNT(*) as c FROM registros_accesos WHERE fecha = ? AND evento = 'SALIDA'", (hoy,))
+            salidas = c.fetchone()['c']
+            
+            c.execute("SELECT COUNT(*) as c FROM registros_accesos WHERE fecha = ? AND evento = 'ENTRADA_RECHAZADA'", (hoy,))
+            rechazos = c.fetchone()['c']
+            
+            permitidos = entradas
+            
+            return jsonify({
+                'total_adentro': adentro,
+                'permitidos': permitidos,
+                'entradas': entradas,
+                'salidas': salidas,
+                'rechazados': rechazos
+            })
+    except Exception as e:
+        logger.error(f"Error en get_dynamic_stats: {e}")
+        return jsonify({
+            'total_adentro': 0,
+            'permitidos': 0,
+            'entradas': 0,
+            'salidas': 0,
+            'rechazados': 0
+        })
 
 @app.route('/admin')
 def admin_page():
@@ -978,7 +1070,37 @@ def api_dashboard_tramites_irsa():
 
 @app.route('/api/dashboard/auditoria')
 def api_dashboard_auditoria():
-    return jsonify({'success': True, 'records': []})
+    desde = request.args.get('desde', '')
+    hasta = request.args.get('hasta', '')
+    tipo = request.args.get('tipo', 'accesos')
+    try:
+        from db_queries import get_db_connection
+        with get_db_connection() as conn:
+            c = conn.cursor()
+            if tipo == 'fichajes':
+                c.execute("""
+                    SELECT fecha as Fecha, dni as DNI, nombre as "Nombre y Apellido",
+                           hora_entrada as Hora_Entrada, hora_salida as Hora_Salida,
+                           categoria, horas_diurnas, horas_nocturnas
+                    FROM registros_fichajes
+                    WHERE fecha >= ? AND fecha <= ?
+                    ORDER BY fecha DESC, hora_entrada DESC
+                """, (desde, hasta))
+                rows = [dict(r) for r in c.fetchall()]
+            else:
+                c.execute("""
+                    SELECT fecha as Fecha, hora as Hora_Ingreso, dni as DNI, nombre as "Nombre y Apellido",
+                           evento as Evento, tipo_permiso as Tipo_Permiso, resultado as Resultado,
+                           local as Local
+                    FROM registros_accesos
+                    WHERE fecha >= ? AND fecha <= ?
+                    ORDER BY fecha DESC, hora DESC
+                """, (desde, hasta))
+                rows = [dict(r) for r in c.fetchall()]
+            return jsonify({'success': True, 'records': rows, 'total': len(rows), 'periodo': f'{desde} a {hasta}'})
+    except Exception as e:
+        logger.error(f"Error en api_dashboard_auditoria: {e}")
+        return jsonify({'success': False, 'message': str(e), 'records': []})
 
 @app.route('/api/config/irsa', methods=['GET', 'POST'])
 def api_config_irsa():
@@ -1327,5 +1449,22 @@ def api_admin_update_code():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 if __name__ == '__main__':
-    print("Iniciando aplicación en modo de depuración...")
-    app.run(host='0.0.0.0', port=5050, debug=True)
+    print("Iniciando aplicación en modo PWA/Desktop...")
+    
+    # Iniciar Flask en un hilo separado
+    flask_thread = threading.Thread(target=lambda: app.run(host='0.0.0.0', port=5050, debug=False, use_reloader=False))
+    flask_thread.daemon = True
+    flask_thread.start()
+    
+    # Crear ventana PWA (PyWebView)
+    window = webview.create_window(
+        'Control de Acceso Oeste - Control de Admisión - Al Oeste Shopping', 
+        'http://127.0.0.1:5050',
+        width=1280,
+        height=800,
+        min_size=(1024, 768)
+    )
+    api.set_window(window)
+    
+    # Arrancar la interfaz
+    webview.start()

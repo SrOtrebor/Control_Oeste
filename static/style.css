@@ -113,6 +113,7 @@ body {
 #resultado.luz-roja { background-color: var(--error-color); }
 #resultado.luz-azul { background-color: var(--visita-color); }
 #resultado.luz-gris { background-color: var(--neutral-color); }
+#resultado.luz-amarilla { background-color: #d97706; color: #ffffff; }
 
 
 /* DNI Input */
@@ -221,6 +222,7 @@ body {
 }
 
 .stat-verde .stat-value { color: var(--success-color); }
+.stat-azul .stat-value { color: #2563eb; }
 .stat-rojo .stat-value { color: var(--error-color); }
 
 
@@ -271,6 +273,8 @@ body {
 .fila-verde { background-color: #e8f5e9; }
 .fila-roja { background-color: #ffebee; }
 .fila-fao { background-color: #fff3e0; }
+.fila-amarilla { background-color: #fef3c7 !important; }
+.fila-amarilla td:first-child { border-left: 5px solid #d97706; }
 
 /* Login Form Specific Styles */
 .form-container {

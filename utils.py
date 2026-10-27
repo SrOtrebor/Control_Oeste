@@ -8,8 +8,9 @@ Funciones auxiliares para:
 """
 
 import os
+import re
 import shutil
-from datetime import datetime
+from datetime import datetime, date
 import pandas as pd
 from logger_config import get_logger
 from config import BASE_DIR
@@ -293,3 +294,52 @@ def obtener_estadisticas_backups():
     except Exception as e:
         logger.error(f"Error al obtener estadísticas de backups: {str(e)}")
         return stats
+
+
+def limpiar_dni(val):
+    """
+    Limpia y normaliza un número de DNI:
+    - Remueve sufijos decimales de Excel (.0)
+    - Remueve puntos, guiones y espacios
+    - Devuelve sólo dígitos como string
+    """
+    if val is None:
+        return ""
+    s = str(val).strip()
+    if not s:
+        return ""
+    if s.endswith('.0'):
+        s = s[:-2]
+    elif '.' in s:
+        partes = s.split('.')
+        if len(partes) == 2 and partes[1].isdigit() and int(partes[1]) == 0:
+            s = partes[0]
+    return re.sub(r'[\.\s-]', '', s).strip()
+
+
+def normalizar_fecha_vencimiento(fecha_val):
+    """
+    Normaliza cualquier formato de fecha a (date_obj, 'DD/MM/YYYY') o (None, 'Indefinido').
+    Soporta: datetime, date, strings en formatos dd/mm/yyyy, yyyy-mm-dd, dd-mm-yyyy, etc.
+    """
+    if not fecha_val or str(fecha_val).strip() in ['Indefinido', 'N/A', '', 'None', 'nan']:
+        return None, 'Indefinido'
+    
+    if isinstance(fecha_val, datetime):
+        return fecha_val.date(), fecha_val.strftime('%d/%m/%Y')
+    if isinstance(fecha_val, date):
+        return fecha_val, fecha_val.strftime('%d/%m/%Y')
+    
+    s = str(fecha_val).strip()
+    if 'T' in s:
+        s = s.split('T')[0]
+    
+    for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%Y/%m/%d'):
+        try:
+            dt = datetime.strptime(s, fmt).date()
+            return dt, dt.strftime('%d/%m/%Y')
+        except ValueError:
+            pass
+            
+    return None, s
+

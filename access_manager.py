@@ -8,6 +8,7 @@ from config import (
     COL_DNI, COL_NOMBRE_APELLIDO, COL_NUM_PERMISO, COL_VENCE, COL_LOCAL, COL_TAREA, COL_TIPO_PERMISO
 )
 from logger_config import get_logger, log_access_event
+from utils import limpiar_dni, normalizar_fecha_vencimiento
 
 import data_manager
 from data_manager import formatear_excel
@@ -16,6 +17,8 @@ from db_queries import (
     borrar_estado_adentro_sqlite, 
     loggear_acceso_sqlite,
     verificar_dni_sqlite, 
+    obtener_permiso_vencido_sqlite,
+    obtener_autorizaciones_por_dni_sqlite,
     registrar_fichaje_sqlite
 )
 from alert_queries import es_persona_de_interes
@@ -258,6 +261,22 @@ def registrar_evento_fichaje(dni, nombre, fecha, hora_entrada, hora_salida):
         logger.error(f"Error crítico al guardar registro de fichaje: {e}", exc_info=True)
         return False
 
+def es_fecha_vencida(vence_str):
+    """Comprueba si una fecha en formato dd/mm/yyyy o yyyy-mm-dd ya expiró comparada con hoy."""
+    dt, _ = normalizar_fecha_vencimiento(vence_str)
+    if dt is None:
+        return False
+    hoy = datetime.now().date()
+    return dt < hoy
+
+def calcular_dias_vencimiento(vence_str):
+    """Calcula cuántos días faltan para que venza el permiso. Devuelve int o None."""
+    dt, _ = normalizar_fecha_vencimiento(vence_str)
+    if dt is None:
+        return None
+    hoy = datetime.now().date()
+    return (dt - hoy).days
+
 def verificar_dni(scanner_data, mode, puerta="Master", tipo_visita=""):
     logger.debug("Iniciando nueva verificación de DNI")
     parsed_data = parsear_codigo_barra(scanner_data)
@@ -271,7 +290,7 @@ def verificar_dni(scanner_data, mode, puerta="Master", tipo_visita=""):
     
     hoy = datetime.now()
     hora_actual_str = hoy.strftime('%H:%M:%S')
-    dni_limpio_str = re.sub(r'[\.\s-]', '', str(dni_ingresado_str)).strip()
+    dni_limpio_str = limpiar_dni(dni_ingresado_str)
     logger.debug(f"DNI parseado y limpiado: '{dni_limpio_str}'")
 
     # --- CHECK LISTA NEGRA (ALERTA SILENCIOSA O DIRECTA) ---
@@ -309,29 +328,105 @@ def verificar_dni(scanner_data, mode, puerta="Master", tipo_visita=""):
     if mode == 'entrada':
         logger.debug("Modo 'entrada' seleccionado. Verificando...")
         
-        permiso = None
+        candidatos_vigentes = []
+        candidatos_vencidos = []
         
         # 1. Validar en listado directo de IRSA (FAOs y FAPs digitales)
         try:
             directorio_irsa = data_manager.obtener_directorio_irsa()
             for p in directorio_irsa:
-                if re.sub(r'[\.\s-]', '', str(p.get('dni', ''))).strip() == dni_limpio_str:
-                    permiso = {
+                if limpiar_dni(p.get('dni', '')) == dni_limpio_str:
+                    cand = {
                         'nombre': p.get('nombre', 'Desconocido'),
                         'local': p.get('empresa', 'N/A'),
-                        'tarea': 'Trabajos Generales',
+                        'tarea': p.get('tarea') or 'Trabajos Generales',
                         'vence': p.get('vence', 'Indefinido'),
                         'tipo_permiso': p.get('tipo', 'IRSA'),
                         'num_permiso': p.get('numero', 'N/A')
                     }
-                    logger.debug(f"Permiso encontrado en IRSA Digital: {permiso}")
-                    break
+                    if es_fecha_vencida(cand.get('vence')):
+                        candidatos_vencidos.append(cand)
+                    else:
+                        candidatos_vigentes.append(cand)
         except Exception as e:
             logger.error(f"Error al verificar en directorio IRSA digital: {e}")
 
-        # 2. Si no está en IRSA directo, buscar en base de datos SQLite (Nóminas, Excepciones, etc)
-        if not permiso:
-            permiso = verificar_dni_sqlite(dni_limpio_str)
+        # 2. Buscar en base de datos SQLite (Nóminas, Excepciones, etc)
+        try:
+            vig_sql, venc_sql = obtener_autorizaciones_por_dni_sqlite(dni_limpio_str)
+            candidatos_vigentes.extend(vig_sql)
+            candidatos_vencidos.extend(venc_sql)
+        except Exception as e:
+            logger.error(f"Error al verificar autorizaciones en SQLite: {e}")
+
+        # Soporte para tests unitarios que hagan monkeypatch de verificar_dni_sqlite
+        try:
+            permiso_sqlite = verificar_dni_sqlite(dni_limpio_str)
+            if permiso_sqlite and permiso_sqlite not in candidatos_vigentes and permiso_sqlite not in candidatos_vencidos:
+                if es_fecha_vencida(permiso_sqlite.get('vence')):
+                    candidatos_vencidos.append(permiso_sqlite)
+                else:
+                    candidatos_vigentes.append(permiso_sqlite)
+        except Exception:
+            pass
+
+        # 3. Evaluar conjunto de permisos para este DNI (PRIORIZAR SIEMPRE VIGENTES)
+        permiso = None
+        permiso_vencido = None
+
+        # Asegurar separación estricta: los candidatos vigentes NO deben estar vencidos
+        candidatos_vigentes_validos = []
+        for c in candidatos_vigentes:
+            if es_fecha_vencida(c.get('vence')):
+                if c not in candidatos_vencidos:
+                    candidatos_vencidos.append(c)
+            else:
+                candidatos_vigentes_validos.append(c)
+
+        if candidatos_vigentes_validos:
+            def parse_venc_date(v_str):
+                dt, _ = normalizar_fecha_vencimiento(v_str)
+                if dt is None:
+                    return datetime.max.date()
+                return dt
+
+            candidatos_vigentes_validos.sort(key=lambda x: parse_venc_date(x.get('vence')), reverse=True)
+            permiso = candidatos_vigentes_validos[0]
+            logger.debug(f"Permiso vigente seleccionado entre {len(candidatos_vigentes_validos)} permisos para {dni_limpio_str}: {permiso}")
+        elif candidatos_vencidos:
+            def parse_venc_vencido(v_str):
+                dt, _ = normalizar_fecha_vencimiento(v_str)
+                if dt is None:
+                    return datetime.min.date()
+                return dt
+
+            candidatos_vencidos.sort(key=lambda x: parse_venc_vencido(x.get('vence')), reverse=True)
+            permiso_vencido = candidatos_vencidos[0]
+            logger.debug(f"Permiso vencido más reciente para {dni_limpio_str}: {permiso_vencido}")
+
+        # 4. Si no tiene permiso vigente pero sí tenía uno vencido, denegar por vencimiento
+        if not permiso and permiso_vencido:
+            nombre = permiso_vencido['nombre']
+            local = permiso_vencido['local']
+            tarea = permiso_vencido['tarea']
+            vence_str = permiso_vencido['vence']
+            tipo_permiso = permiso_vencido['tipo_permiso']
+            num_permiso = permiso_vencido['num_permiso']
+            
+            logger.warning(f"Acceso DENEGADO por vencimiento - DNI: {dni_limpio_str}, Nombre: {nombre}, Tipo: {tipo_permiso}, Vence: {vence_str}")
+            log_access_event(dni_limpio_str, nombre, 'DENEGADO', tipo_permiso, f'Permiso vencido el {vence_str}')
+            
+            mensaje = f'ACCESO DENEGADO: Permiso {tipo_permiso} #{num_permiso} VENCIDO el {vence_str}.'
+            if not es_interes:
+                send_alert(dni_limpio_str, nombre, f"ACCESO DENEGADO: Permiso vencido el {vence_str}", nivel="warning")
+            
+            registrar_evento(dni_limpio_str, nombre, hora_actual_str, 'Entrada RECHAZADA', tipo_permiso, num_permiso, local, tarea, 'DENEGADO')
+            loggear_acceso_sqlite(dni_limpio_str, nombre, 'ENTRADA_RECHAZADA', tipo_permiso, num_permiso, local, tarea, 'DENEGADO', f'Permiso vencido el {vence_str}', puerta=puerta)
+            
+            return {
+                'acceso': 'DENEGADO', 'nombre': nombre, 'mensaje': mensaje,
+                'tipo_permiso': tipo_permiso, 'num_permiso': num_permiso, 'local': local, 'tarea': tarea, 'vence': vence_str
+            }
         
         if permiso:
             nombre = permiso['nombre']
@@ -341,7 +436,17 @@ def verificar_dni(scanner_data, mode, puerta="Master", tipo_visita=""):
             tipo_permiso = permiso['tipo_permiso']
             num_permiso = permiso['num_permiso']
             
-            logger.info(f"Acceso PERMITIDO - DNI: {dni_limpio_str}, Nombre: {nombre}, Tipo: {tipo_permiso}")
+            dias_restantes = calcular_dias_vencimiento(vence_str)
+            es_alerta_venc = (dias_restantes is not None and 0 <= dias_restantes <= 5)
+
+            if es_alerta_venc:
+                texto_dias = "HOY" if dias_restantes == 0 else ("MAÑANA" if dias_restantes == 1 else f"en {dias_restantes} días")
+                mensaje_display = f'⚠️ ACCESO PERMITIDO ({tipo_permiso}): {nombre} - VENCE {texto_dias.upper()}'
+                logger.warning(f"Acceso PERMITIDO con aviso de vencimiento próximo ({dias_restantes} días) - DNI: {dni_limpio_str}, Vence: {vence_str}")
+            else:
+                mensaje_display = f'ACCESO PERMITIDO ({tipo_permiso}): {nombre}'
+                logger.info(f"Acceso PERMITIDO - DNI: {dni_limpio_str}, Nombre: {nombre}, Tipo: {tipo_permiso}")
+
             log_access_event(dni_limpio_str, nombre, 'PERMITIDO', tipo_permiso, f'Local: {local}, Vence: {vence_str}')
             
             personas_adentro[dni_limpio_str] = tipo_permiso
@@ -352,8 +457,10 @@ def verificar_dni(scanner_data, mode, puerta="Master", tipo_visita=""):
             guardar_estado_adentro_sqlite(dni_limpio_str, nombre, hora_actual_str, tipo_permiso, local, puerta=puerta)
             
             return {
-                'acceso': 'PERMITIDO', 'nombre': nombre, 'mensaje': f'ACCESO PERMITIDO ({tipo_permiso}): {nombre}', 
-                'tipo_permiso': tipo_permiso, 'num_permiso': num_permiso, 'local': local, 'tarea': tarea, 'vence': vence_str
+                'acceso': 'PERMITIDO', 'nombre': nombre, 'mensaje': mensaje_display, 
+                'tipo_permiso': tipo_permiso, 'num_permiso': num_permiso, 'local': local, 'tarea': tarea, 'vence': vence_str,
+                'alerta_vencimiento': es_alerta_venc,
+                'dias_para_vencer': dias_restantes
             }
         else:
             logger.warning(f"Acceso DENEGADO - DNI: {dni_limpio_str} no encontrado o sin permiso vigente")

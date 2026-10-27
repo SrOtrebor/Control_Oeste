@@ -1,4 +1,4 @@
-?<!DOCTYPE html>
+<!DOCTYPE html>
 
 <html lang="es">
 
@@ -14,7 +14,7 @@
 
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 
-    <link rel="stylesheet" href="css/dashboard.css">
+    <link rel="stylesheet" href="css/dashboard.css?v=20261020_1">
 
     <link rel="manifest" href="/manifest.json">
 
@@ -28,7 +28,7 @@
 
     </script>
 
-    <script type="module" src="js/dashboard_auth.js"></script>
+    <script type="module" src="js/dashboard_auth.js?v=20261019_2"></script>
 
 
 <style>
@@ -81,6 +81,9 @@
             <h1><span class="material-icons">security</span> Control de Acceso</h1>
 
             <span class="dash-sede">Al Oeste Shopping</span>
+            <a href="/planos/" target="_blank" class="dash-btn-plano" title="Abrir Plano Interactivo en una nueva pestaña">
+                <span class="material-icons">map</span> Plano Interactivo
+            </a>
 
         </div>
 
@@ -265,17 +268,14 @@
                 </button>
 
                 <button class="dash-tab" data-tab="config">
-
                     <span class="material-icons">settings</span> Configuración
-
                 </button>
-
-                <button class="dash-tab" data-tab="usuarios">
-
+                <button class="dash-tab super-admin-only" data-tab="usuarios" style="display: none;">
                     <span class="material-icons">manage_accounts</span> Usuarios
-
                 </button>
-
+                <button class="dash-tab super-admin-only" data-tab="shoppings" style="display: none;">
+                    <span class="material-icons">business</span> Shoppings
+                </button>
             </div>
 
         </section>
@@ -424,6 +424,46 @@
 
             </div>
 
+            <div class="panel-header" style="margin-top: 2rem;">
+
+                <h2>📋 Historial de Cierres de Jornada (Auditoría)</h2>
+
+            </div>
+
+            <div class="table-wrapper">
+
+                <table class="dash-table" id="tablaCierresJornada">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>Fecha</th>
+
+                            <th>Hora</th>
+
+                            <th>Operario</th>
+
+                            <th>Personas Sin Salida</th>
+
+                            <th>Observación</th>
+
+                            <th>Acciones</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="bodyCierresJornada">
+
+                        <tr><td colspan="6" class="empty-state">Cargando cierres...</td></tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
         </section>
 
 
@@ -434,7 +474,7 @@
 
             <div class="panel-header">
 
-                <h2>Auditoría por Perodo</h2>
+                <h2>Auditoría por Período</h2>
 
                 <div class="panel-filters audit-filters">
 
@@ -492,7 +532,7 @@
 
                     <thead id="headAuditoria">
 
-                        <tr><th colspan="7" class="empty-state">Seleccion un rango de fechas y hac clic en "Buscar"</th></tr>
+                        <tr><th colspan="9" class="empty-state">Seleccioná un rango de fechas y hacé clic en "Buscar"</th></tr>
 
                     </thead>
 
@@ -603,6 +643,10 @@
                     <select id="filterTramitesEstado" class="dash-select">
 
                         <option value="TODOS">Todos los estados</option>
+
+                        <option value="VIGENTES">Solo Vigentes (Aprobados)</option>
+
+                        <option value="VENCIDOS">Solo Vencidos</option>
 
                         <option value="6">Aprobado</option>
 
@@ -796,6 +840,63 @@
 
                 </div>
 
+                <!-- Listado y Gestión de Excepciones Activas -->
+                <div class="config-card" style="background: var(--dash-surface-hover); padding: 1.5rem; border-radius: var(--dash-radius); border: 1px solid var(--dash-border); margin-top: 2rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
+                        <div>
+                            <h3 style="color: var(--dash-primary); display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                                <span class="material-icons">fact_check</span> Excepciones y Nóminas Especiales Registradas
+                            </h3>
+                            <p style="color: var(--dash-text-muted); font-size: 0.88rem; margin: 0;">
+                                Personal cargado como excepción temporal. Podés buscar, modificar la fecha de vencimiento o dar de baja.
+                            </p>
+                        </div>
+                        <div style="display: flex; gap: 0.75rem; align-items: center;">
+                            <span id="badgeTotalExcepciones" class="badge" style="font-size: 0.85rem; padding: 6px 14px; border-radius: 20px; background: rgba(59, 130, 246, 0.15); color: var(--dash-primary); border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 600;">
+                                Cargando excepciones...
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Filtros del Listado -->
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap; align-items: center;">
+                        <div style="flex: 2; min-width: 240px;">
+                            <input type="text" id="filterExcepcionesInput" class="dash-input" placeholder="🔍 Buscar por DNI, Nombre o Empresa..." style="width: 100%;">
+                        </div>
+                        <div style="flex: 1; min-width: 180px;">
+                            <select id="filterExcepcionesEstado" class="dash-select" style="width: 100%;">
+                                <option value="TODAS">Todos los estados</option>
+                                <option value="VIGENTES" selected>Solo Vigentes (Autorizadas)</option>
+                                <option value="VENCIDAS">Solo Vencidas</option>
+                            </select>
+                        </div>
+                        <div>
+                            <button id="btnRecargarExcepciones" class="dash-btn dash-btn-outline" style="display: flex; align-items: center; gap: 4px;">
+                                <span class="material-icons">refresh</span> Actualizar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de Excepciones -->
+                    <div class="table-wrapper" style="background: var(--dash-bg); border-radius: var(--dash-radius-sm); border: 1px solid var(--dash-border); overflow-x: auto;">
+                        <table class="dash-table" style="width: 100%;" id="tablaExcepciones">
+                            <thead>
+                                <tr>
+                                    <th>DNI</th>
+                                    <th>Nombre y Apellido</th>
+                                    <th>Empresa / Motivo</th>
+                                    <th>Fecha Vencimiento</th>
+                                    <th>Estado</th>
+                                    <th style="text-align: right;">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bodyExcepciones">
+                                <tr><td colspan="6" class="empty-state" style="text-align: center; padding: 2rem;">Cargando excepciones...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
             </div>
 
         </section>
@@ -903,31 +1004,20 @@
                     
 
                     <!-- Caja Anti-Bloqueos IRSA (Bypass) -->
-
                     <div class="config-card" style="background: var(--dash-surface-hover); padding: 1.5rem; border-radius: var(--dash-radius); border: 1px solid var(--dash-border); margin-bottom: 2rem; border-left: 4px solid var(--dash-primary);">
-
                         <h3 style="margin-bottom: 0.5rem; color: var(--dash-primary); display: flex; align-items: center; gap: 0.5rem;">
-
                             <span class="material-icons">security_update_warning</span> Anti-Bloqueo de Permisos IRSA
-
                         </h3>
-
-                        <p style="color: var(--dash-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Si IRSA no reporta automticamente un trmite (como los que estn en proceso de firma), pods forzar la descarga manual escribiendo el ID.</p>
-
+                        <p style="color: var(--dash-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+                            Si un trámite de IRSA (FAO o FAP) no aparece en la nómina (por ejemplo si está en proceso de firma o no ingresó en el lote general), podés ingresar el N° de trámite y forzar su descarga e ingreso a la nómina de inmediato.
+                        </p>
                         
-
                         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-
-                            <input type="text" id="manualFaoInput" placeholder="N° de Trmite (ej: 1266421)" style="flex: 1; padding: 10px; border-radius: 4px; border: 1px solid var(--dash-border); background: var(--dash-surface); color: var(--dash-text);">
-
+                            <input type="text" id="manualFaoInput" placeholder="N° de Trámite FAO o FAP (ej: 1266421)" style="flex: 1; padding: 10px; border-radius: 4px; border: 1px solid var(--dash-border); background: var(--dash-surface); color: var(--dash-text);">
                             <button id="btnManualSync" class="dash-btn dash-btn-primary" style="padding: 10px 20px;">
-
                                 <span class="material-icons">download</span> Descarga Forzada
-
                             </button>
-
                         </div>
-
                     </div>
 
 
@@ -1296,60 +1386,176 @@
 
 
 
-        <!-- Tab: Usuarios (Crear Usuarios) -->
-
-        <section class="dash-panel hidden" id="panel-usuarios" style="overflow-y: auto;">
-
+        <!-- Tab: Usuarios (Gestión de Usuarios y Garitas - Solo Super Admin) -->
+        <section class="dash-panel hidden super-admin-only" id="panel-usuarios" style="overflow-y: auto; display: none;">
             <div class="panel-header">
-
-                <h2>Gestin de Usuarios</h2>
-
+                <h2>Gestión de Usuarios y Garitas (Super Admin)</h2>
             </div>
+            
+            <div style="display: grid; grid-template-columns: minmax(320px, 400px) 1fr; gap: 24px; margin-top: 15px; align-items: start;">
+                <!-- Card Crear Usuario -->
+                <div style="background: var(--dash-surface); border: 1px solid var(--dash-border); border-radius: var(--dash-radius); padding: 22px;">
+                    <h3 style="font-size: 1.1rem; margin-bottom: 6px; color: var(--dash-text); display: flex; align-items: center; gap: 8px;">
+                        <span class="material-icons" style="color: var(--dash-primary);">person_add</span> Crear Nuevo Usuario
+                    </h3>
+                    <p style="font-size: 0.85rem; color: var(--dash-text-muted); margin-bottom: 18px;">
+                        Generar cuentas de acceso para guardias o supervisores.
+                    </p>
 
-            <div class="panel-content" style="max-width: 500px; padding: 20px; background: var(--card-bg); border-radius: 8px;">
+                    <form id="formCrearUsuario" onsubmit="window.crearNuevoUsuario(event); return false;">
+                        <div style="margin-bottom: 12px;">
+                            <label style="display:block; font-size: 0.8rem; color: var(--dash-text-muted); margin-bottom: 4px;">Nombre o Identificador (opcional):</label>
+                            <input type="text" id="newUserName" class="dash-input" placeholder="Ej: Garita Norte, Juan Gómez" style="width:100%;">
+                        </div>
 
-                <p>Crear cuentas para los guardias de seguridad.</p>
+                        <div style="margin-bottom: 12px;">
+                            <label style="display:block; font-size: 0.8rem; color: var(--dash-text-muted); margin-bottom: 4px;">Correo Electrónico *:</label>
+                            <input type="email" id="newUserEmail" class="dash-input" placeholder="garita1@oeste.com" required style="width:100%;">
+                        </div>
+                        
+                        <div style="margin-bottom: 12px;">
+                            <label style="display:block; font-size: 0.8rem; color: var(--dash-text-muted); margin-bottom: 4px;">Contraseña * (Mínimo 6 caracteres):</label>
+                            <input type="password" id="newUserPassword" class="dash-input" placeholder="••••••••" required minlength="6" style="width:100%;">
+                        </div>
+                        
+                        <div style="margin-bottom: 12px;">
+                            <label style="display:block; font-size: 0.8rem; color: var(--dash-text-muted); margin-bottom: 4px;">Rol Asignado *:</label>
+                            <select id="newUserRole" class="dash-select" style="width:100%;">
+                                <option value="acceso_principal">Garita Principal (Fichaje y Escaneo)</option>
+                                <option value="acceso_satelite">Garita Satélite (Solo Escaneo)</option>
+                                <option value="supervisor">Supervisor (Acceso al Dashboard)</option>
+                                <option value="super_admin">Super Administrador</option>
+                            </select>
+                        </div>
 
-                
+                        <div style="margin-bottom: 18px;">
+                            <label style="display:block; font-size: 0.8rem; color: var(--dash-text-muted); margin-bottom: 4px;">Shopping / Sede Asignada *:</label>
+                            <select id="newUserCentro" class="dash-select" style="width:100%;">
+                                <option value="al_oeste">Al Oeste Shopping</option>
+                            </select>
+                        </div>
 
-                <div style="margin-top: 15px;">
+                        <button type="submit" id="btnCrearUsuario" class="dash-btn dash-btn-primary" style="width: 100%; justify-content: center;">
+                            <span class="material-icons">add_circle</span> Crear Usuario
+                        </button>
+                    </form>
 
-                    <label style="display:block; margin-bottom:5px;">Correo Electrnico:</label>
-
-                    <input type="email" id="newUserEmail" class="dash-input" placeholder="garita1@oeste.com" style="width:100%; margin-bottom: 15px;">
-
-                    
-
-                    <label style="display:block; margin-bottom:5px;">Contrasea:</label>
-
-                    <input type="password" id="newUserPassword" class="dash-input" placeholder="Mnimo 6 caracteres" style="width:100%; margin-bottom: 15px;">
-
-                    
-
-                    <label style="display:block; margin-bottom:5px;">Rol Asignado:</label>
-
-                    <select id="newUserRole" class="dash-select" style="width:100%; margin-bottom: 20px;">
-
-                        <option value="acceso_principal">Garita Principal (Puede Fichar)</option>
-
-                        <option value="acceso_satelite">Garita Satlite (Solo lectura)</option>
-
-                        <option value="supervisor">Supervisor (Acceso al Dashboard)</option>
-
-                        <option value="super_admin">Super Administrador</option>
-
-                    </select>
-
-
-
-                    <button class="dash-btn dash-btn-primary" onclick="window.crearNuevoUsuario()" style="width: 100%;">Crear Usuario</button>
-
-                    <p id="msgCrearUsuario" style="margin-top: 15px; font-weight: bold;"></p>
-
+                    <p id="msgCrearUsuario" style="margin-top: 15px; font-weight: 600; font-size: 0.85rem; min-height: 20px;"></p>
                 </div>
 
-            </div>
+                <!-- Card Listado de Usuarios -->
+                <div style="background: var(--dash-surface); border: 1px solid var(--dash-border); border-radius: var(--dash-radius); padding: 22px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <div>
+                            <h3 style="font-size: 1.1rem; color: var(--dash-text); display: flex; align-items: center; gap: 8px;">
+                                <span class="material-icons" style="color: var(--dash-info);">manage_accounts</span> Usuarios Registrados
+                            </h3>
+                            <p style="font-size: 0.85rem; color: var(--dash-text-muted);">
+                                Cuentas con permisos para operar en garitas o panel de control.
+                            </p>
+                        </div>
+                        <span id="badgeTotalUsuarios" style="background: var(--dash-surface-hover); border: 1px solid var(--dash-border); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; color: var(--dash-text);">0 usuarios</span>
+                    </div>
 
+                    <div class="table-wrapper" style="max-height: 480px; overflow-y: auto;">
+                        <table class="dash-table" id="tablaUsuarios">
+                            <thead>
+                                <tr>
+                                    <th>Correo Electrónico</th>
+                                    <th>Identificador</th>
+                                    <th>Rol</th>
+                                    <th>Shopping / Sede</th>
+                                    <th>Estado</th>
+                                    <th style="text-align: right;">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bodyUsuarios">
+                                <tr><td colspan="6" class="empty-state">Cargando usuarios...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tab: Shoppings (Gestión de Centros Comerciales - Solo Super Admin) -->
+        <section class="dash-panel hidden super-admin-only" id="panel-shoppings" style="overflow-y: auto; display: none;">
+            <div class="panel-header">
+                <h2>Gestión de Centros Comerciales / Shoppings (Super Admin)</h2>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: minmax(320px, 400px) 1fr; gap: 24px; margin-top: 15px; align-items: start;">
+                <!-- Card Crear Shopping -->
+                <div style="background: var(--dash-surface); border: 1px solid var(--dash-border); border-radius: var(--dash-radius); padding: 22px;">
+                    <h3 style="font-size: 1.1rem; margin-bottom: 6px; color: var(--dash-text); display: flex; align-items: center; gap: 8px;">
+                        <span class="material-icons" style="color: var(--dash-primary);">add_business</span> Nuevo Shopping
+                    </h3>
+                    <p style="font-size: 0.85rem; color: var(--dash-text-muted); margin-bottom: 18px;">
+                        Dar de alta un nuevo centro comercial en la plataforma.
+                    </p>
+
+                    <form id="formCrearCentro" onsubmit="window.crearNuevoCentro(event); return false;">
+                        <div style="margin-bottom: 12px;">
+                            <label style="display:block; font-size: 0.8rem; color: var(--dash-text-muted); margin-bottom: 4px;">Nombre del Shopping *:</label>
+                            <input type="text" id="newCentroNombre" class="dash-input" placeholder="Ej: Distrito Arcos, Abasto" required style="width:100%;" oninput="window.autoGenerarCodigoCentro(this.value)">
+                        </div>
+
+                        <div style="margin-bottom: 12px;">
+                            <label style="display:block; font-size: 0.8rem; color: var(--dash-text-muted); margin-bottom: 4px;">Código Único (ID) *:</label>
+                            <input type="text" id="newCentroId" class="dash-input" placeholder="Ej: distrito_arcos" required style="width:100%;">
+                        </div>
+
+                        <div style="margin-bottom: 12px;">
+                            <label style="display:block; font-size: 0.8rem; color: var(--dash-text-muted); margin-bottom: 4px;">Dirección / Ubicación:</label>
+                            <input type="text" id="newCentroDireccion" class="dash-input" placeholder="Ej: Paraguay 4979, Palermo" style="width:100%;">
+                        </div>
+
+                        <div style="margin-bottom: 18px;">
+                            <label style="display:block; font-size: 0.8rem; color: var(--dash-text-muted); margin-bottom: 4px;">ID Shopping en Portal IRSA (Opcional):</label>
+                            <input type="text" id="newCentroIrsaId" class="dash-input" placeholder="Ej: 11" style="width:100%;">
+                        </div>
+
+                        <button type="submit" id="btnCrearCentro" class="dash-btn dash-btn-primary" style="width: 100%; justify-content: center;">
+                            <span class="material-icons">add_business</span> Registrar Shopping
+                        </button>
+                    </form>
+
+                    <p id="msgCrearCentro" style="margin-top: 15px; font-weight: 600; font-size: 0.85rem; min-height: 20px;"></p>
+                </div>
+
+                <!-- Card Listado de Shoppings -->
+                <div style="background: var(--dash-surface); border: 1px solid var(--dash-border); border-radius: var(--dash-radius); padding: 22px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <div>
+                            <h3 style="font-size: 1.1rem; color: var(--dash-text); display: flex; align-items: center; gap: 8px;">
+                                <span class="material-icons" style="color: var(--dash-primary);">storefront</span> Sedes Instaladas
+                            </h3>
+                            <p style="font-size: 0.85rem; color: var(--dash-text-muted);">
+                                Centros comerciales activos en el sistema de accesos.
+                            </p>
+                        </div>
+                        <span id="badgeTotalCentros" style="background: var(--dash-surface-hover); border: 1px solid var(--dash-border); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; color: var(--dash-text);">0 sedes</span>
+                    </div>
+
+                    <div class="table-wrapper" style="max-height: 480px; overflow-y: auto;">
+                        <table class="dash-table" id="tablaCentros">
+                            <thead>
+                                <tr>
+                                    <th>Nombre del Centro</th>
+                                    <th>Código ID</th>
+                                    <th>Dirección</th>
+                                    <th>ID IRSA</th>
+                                    <th>Estado</th>
+                                    <th style="text-align: right;">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bodyCentros">
+                                <tr><td colspan="6" class="empty-state">Cargando centros...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </section>
 
 
@@ -1558,155 +1764,9 @@
 
 
 
-    <script type="module" src="js/dashboard.js"></script>
+    <script type="module" src="js/dashboard.js?v=20261023_1"></script>
 
-    <script type="module">
 
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-
-        import { getAuth, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-
-        import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-
-        
-
-        const firebaseConfig = {
-
-            apiKey: "AIzaSyBg0ht9KWgGrhGmHkT7mzCRgJ2CS6e4-lQ",
-
-            authDomain: "control-acceso-c2f82.firebaseapp.com",
-
-            projectId: "control-acceso-c2f82",
-
-            storageBucket: "control-acceso-c2f82.firebasestorage.app",
-
-            messagingSenderId: "654089830879",
-
-            appId: "1:654089830879:web:96b5a40c8fc6292422446a"
-
-        };
-
-        
-
-        // Inicializar app principal para base de datos
-
-        const dbApp = initializeApp(firebaseConfig, "dbApp");
-
-        const db = getFirestore(dbApp);
-
-        
-
-        // Inicializar app secundaria para evitar desloguear al Super Admin
-
-        const secondaryApp = initializeApp(firebaseConfig, "Secondary");
-
-        const secondaryAuth = getAuth(secondaryApp);
-
-
-
-        window.crearNuevoUsuario = async function() {
-
-            const email = document.getElementById('newUserEmail').value;
-
-            const password = document.getElementById('newUserPassword').value;
-
-            const rol = document.getElementById('newUserRole').value;
-
-            const msgEl = document.getElementById('msgCrearUsuario');
-
-            
-
-            if(!email || !password || !rol) {
-
-                msgEl.style.color = '#ff3b30';
-
-                msgEl.textContent = 'Por favor complete todos los campos.';
-
-                return;
-
-            }
-
-            if(password.length < 6) {
-
-                msgEl.style.color = '#ff3b30';
-
-                msgEl.textContent = 'La contrasea debe tener al menos 6 caracteres.';
-
-                return;
-
-            }
-
-            
-
-            msgEl.style.color = '#007aff';
-
-            msgEl.textContent = 'Creando usuario directamente en la nube...';
-
-            
-
-            try {
-
-                // Crear usuario en Auth Secundario
-
-                const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
-
-                const newUid = userCredential.user.uid;
-
-                
-
-                // Cerrar la sesin secundaria al instante
-
-                await signOut(secondaryAuth);
-
-                
-
-                // Guardar el rol en Firestore usando la app principal
-
-                await setDoc(doc(db, "usuarios", newUid), {
-
-                    email: email,
-
-                    rol: rol,
-
-                    activo: true,
-
-                    centro_id: 'al_oeste'
-
-                });
-
-                
-
-                msgEl.style.color = '#34c759';
-
-                msgEl.textContent = '¡Usuario creado exitosamente desde la nube!';
-
-                document.getElementById('newUserEmail').value = '';
-
-                document.getElementById('newUserPassword').value = '';
-
-                
-
-            } catch(e) {
-
-                msgEl.style.color = '#ff3b30';
-
-                console.error(e);
-
-                if (e.code === 'auth/email-already-in-use') {
-
-                    msgEl.textContent = 'Error: El correo ya est en uso.';
-
-                } else {
-
-                    msgEl.textContent = 'Error: ' + e.message;
-
-                }
-
-            }
-
-        };
-
-    </script>
 
 <!-- Modal: ABM Personal (Ex Nmina Form) -->
 
@@ -1916,9 +1976,81 @@
 
 
 
+<!-- Modal Detalle Cierre de Jornada (Auditoría) -->
+<div id="modalDetalleCierre" class="dash-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:var(--dash-surface); border:1px solid var(--dash-border); border-radius:var(--dash-radius); width:750px; max-width:92%; max-height:85vh; display:flex; flex-direction:column; padding:1.5rem; box-shadow:var(--dash-shadow);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--dash-border); padding-bottom:0.75rem;">
+            <h3 id="detalleCierreTitulo" style="margin:0; color:var(--dash-primary); display:flex; align-items:center; gap:0.5rem;">
+                <span class="material-icons">fact_check</span> Detalle de Personas que quedaron Adentro
+            </h3>
+            <span id="closeModalDetalleCierre" style="cursor:pointer; font-size:1.5rem; font-weight:bold; color:var(--dash-text-muted);">&times;</span>
+        </div>
+        <p id="detalleCierreSubtitulo" style="font-size:0.9rem; color:var(--dash-text-muted); margin-bottom:1rem;"></p>
+        <div style="flex:1; overflow-y:auto; border:1px solid var(--dash-border); border-radius:var(--dash-radius-sm);">
+            <table class="dash-table" style="width:100%;" id="tablaDetalleCierrePersonas">
+                <thead>
+                    <tr>
+                        <th>DNI</th>
+                        <th>Nombre y Apellido</th>
+                        <th>Hora Ingreso</th>
+                        <th>Permiso / Trámite</th>
+                        <th>Local / Destino</th>
+                    </tr>
+                </thead>
+                <tbody id="bodyDetalleCierrePersonas"></tbody>
+            </table>
+        </div>
+        <div style="display:flex; justify-content:flex-end; margin-top:1rem;">
+            <button class="dash-btn" id="btnCerrarModalDetalle" style="background:var(--dash-surface-hover); color:var(--dash-text);">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Editar Excepción -->
+<div id="modalEditarExcepcion" class="dash-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); backdrop-filter:blur(3px); z-index:9999; align-items:center; justify-content:center; padding:1rem;">
+    <div style="background:var(--dash-surface); border:1px solid var(--dash-border); border-radius:var(--dash-radius); width:100%; max-width:520px; padding:1.75rem; box-shadow:var(--dash-shadow);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem; border-bottom:1px solid var(--dash-border); padding-bottom:0.75rem;">
+            <h3 style="margin:0; color:var(--dash-primary); display:flex; align-items:center; gap:0.5rem; font-size:1.2rem;">
+                <span class="material-icons">edit_calendar</span> Modificar Excepción
+            </h3>
+            <span onclick="window.cerrarModalEditarExcepcion()" style="cursor:pointer; font-size:1.5rem; font-weight:bold; color:var(--dash-text-muted);">&times;</span>
+        </div>
+        
+        <input type="hidden" id="editExcepcionDocId">
+
+        <div style="display:flex; flex-direction:column; gap:1rem; margin-bottom:1.5rem;">
+            <div>
+                <label style="display:block; margin-bottom:0.35rem; font-size:0.85rem; color:var(--dash-text-muted);">DNI</label>
+                <input type="text" id="editExcepcionDni" class="dash-input" style="width:100%; background:var(--dash-bg); opacity:0.85;" readonly>
+            </div>
+            <div>
+                <label style="display:block; margin-bottom:0.35rem; font-size:0.85rem; color:var(--dash-text);">Nombre y Apellido</label>
+                <input type="text" id="editExcepcionNombre" class="dash-input" style="width:100%;" required>
+            </div>
+            <div>
+                <label style="display:block; margin-bottom:0.35rem; font-size:0.85rem; color:var(--dash-text);">Empresa / Motivo</label>
+                <input type="text" id="editExcepcionEmpresa" class="dash-input" style="width:100%;" required>
+            </div>
+            <div>
+                <label style="display:block; margin-bottom:0.35rem; font-size:0.85rem; color:var(--dash-text);">Fecha de Vencimiento (Hasta cuándo tiene permiso)</label>
+                <input type="date" id="editExcepcionVencimiento" class="dash-input" style="width:100%;" required>
+            </div>
+            <p id="editExcepcionStatus" style="font-size:0.85rem; margin:0; display:none;"></p>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:0.75rem;">
+            <button type="button" class="dash-btn dash-btn-outline" onclick="window.cerrarModalEditarExcepcion()">Cancelar</button>
+            <button type="button" class="dash-btn dash-btn-primary" id="btnGuardarEditExcepcion" onclick="window.guardarEdicionExcepcion()">
+                <span class="material-icons">save</span> Guardar Cambios
+            </button>
+        </div>
+    </div>
+</div>
+
 <script type="module" src="/js/nomina_logic_snippet.js"></script>
 
 </body>
 
 </html>
+
 

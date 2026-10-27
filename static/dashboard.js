@@ -224,7 +224,7 @@ function renderPersonasAdentro(personas) {
         return `<div class="persona-card">
             <div class="persona-icon ${iconClass}">${icon}</div>
             <div class="persona-info">
-                <span class="persona-dni">${p.dni}</span>
+                <span class="persona-dni" title="DNI: ${p.dni || p.DNI || 'Desconocido'}">${p.nombre || p.Nombre || p.DNI || p.dni || 'Sin nombre'}</span>
                 <span class="persona-tipo">${p.tipo_permiso}</span>
             </div>
         </div>`;
@@ -321,13 +321,18 @@ function renderAuditoria(tipo) {
     } else {
         thead.innerHTML = `<tr>
             <th>Fecha</th><th>Hora</th><th>DNI</th><th>Nombre</th>
-            <th>Evento</th><th>Tipo Permiso</th><th>Resultado</th>
+            <th>Evento</th><th>Tipo Permiso</th><th>Local/Destino</th><th>Resultado</th><th>Observaciones / Nota</th>
         </tr>`;
         tbody.innerHTML = auditoriaData.map(r => {
             const resultado = (r.Resultado || '').toUpperCase();
             let badgeClass = 'badge-info';
             if (resultado.includes('AUTORIZADO') || resultado === 'VERDE') badgeClass = 'badge-success';
             else if (resultado.includes('DENEGADO') || resultado === 'ROJO') badgeClass = 'badge-danger';
+
+            const comentario = r.Comentario || r.comentario || r.observacion || r.Observacion || r.motivo_rechazo || r.Motivo_Rechazo || '';
+            const comentarioHtml = comentario 
+                ? `<span style="color:#fbbf24; font-weight:500; font-size:0.85rem; display:inline-flex; align-items:center; gap:4px; background:rgba(251,191,36,0.12); padding:3px 8px; border-radius:4px; border:1px solid rgba(251,191,36,0.3);">📝 ${comentario}</span>`
+                : '<span style="color:var(--dash-text-muted); opacity:0.4;">—</span>';
 
             return `<tr>
                 <td>${r.Fecha || ''}</td>
@@ -336,7 +341,9 @@ function renderAuditoria(tipo) {
                 <td>${r['Nombre y Apellido'] || ''}</td>
                 <td>${r.Evento || ''}</td>
                 <td>${r.Tipo_Permiso || ''}</td>
+                <td>${r.Local || r.local || '—'}</td>
                 <td><span class="badge ${badgeClass}">${r.Resultado || ''}</span></td>
+                <td>${comentarioHtml}</td>
             </tr>`;
         }).join('');
     }
@@ -347,17 +354,48 @@ function exportarAuditoria() {
     const hasta = document.getElementById('auditHasta').value;
     const tipo = document.getElementById('auditTipo').value;
 
-    if (!desde || !hasta) {
-        alert('Seleccioná ambas fechas primero');
+    if (!auditoriaData || auditoriaData.length === 0) {
+        alert('No hay registros cargados para exportar. Por favor seleccioná un período y hacé clic en "Buscar".');
         return;
     }
 
-    // Usar los endpoints de descarga existentes
+    let csvContent = '\uFEFF'; // BOM UTF-8 para abrir directo en Excel en Windows
+
     if (tipo === 'fichajes') {
-        window.location.href = `/descargar_fichajes_fechas?desde=${desde}&hasta=${hasta}`;
+        csvContent += 'Fecha;DNI;Nombre y Apellido;Hora Entrada;Hora Salida\r\n';
+        auditoriaData.forEach(r => {
+            const fecha = `"${String(r.Fecha || '').replace(/"/g, '""')}"`;
+            const dni = `"${String(r.DNI || '').replace(/"/g, '""')}"`;
+            const nombre = `"${String(r['Nombre y Apellido'] || r.nombre || '').replace(/"/g, '""')}"`;
+            const entrada = `"${String(r.Hora_Entrada || r.hora_entrada || '').replace(/"/g, '""')}"`;
+            const salida = `"${String(r.Hora_Salida || r.hora_salida || '').replace(/"/g, '""')}"`;
+            csvContent += `${fecha};${dni};${nombre};${entrada};${salida}\r\n`;
+        });
     } else {
-        window.location.href = `/descargar_reporte_fechas?desde=${desde}&hasta=${hasta}`;
+        csvContent += 'Fecha;Hora;DNI;Nombre y Apellido;Evento;Tipo Permiso;Local;Resultado;Comentario\r\n';
+        auditoriaData.forEach(r => {
+            const fecha = `"${String(r.Fecha || '').replace(/"/g, '""')}"`;
+            const hora = `"${String(r.Hora_Ingreso || r.Hora_Salida || r.hora || '').replace(/"/g, '""')}"`;
+            const dni = `"${String(r.DNI || '').replace(/"/g, '""')}"`;
+            const nombre = `"${String(r['Nombre y Apellido'] || r.nombre || '').replace(/"/g, '""')}"`;
+            const evento = `"${String(r.Evento || r.evento || '').replace(/"/g, '""')}"`;
+            const tipoPermiso = `"${String(r.Tipo_Permiso || r.tipo_permiso || '').replace(/"/g, '""')}"`;
+            const local = `"${String(r.Local || r.local || '').replace(/"/g, '""')}"`;
+            const resultado = `"${String(r.Resultado || '').replace(/"/g, '""')}"`;
+            const comentario = `"${String(r.Comentario || r.comentario || '').replace(/"/g, '""')}"`;
+            csvContent += `${fecha};${hora};${dni};${nombre};${evento};${tipoPermiso};${local};${resultado};${comentario}\r\n`;
+        });
     }
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `auditoria_${tipo}_${desde}_al_${hasta}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 
 // =============================================

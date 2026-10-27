@@ -33,12 +33,16 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    user-select: text;
+    -webkit-user-select: text;
 }
 
 .app-container {
     flex: 1;
     display: flex;
     flex-direction: column;
+    user-select: text;
+    -webkit-user-select: text;
 }
 
 /* Header Styles */
@@ -121,6 +125,7 @@ body {
 #resultado.luz-roja { background-color: var(--error-color); }
 #resultado.luz-azul { background-color: var(--visita-color); }
 #resultado.luz-gris { background-color: var(--neutral-color); }
+#resultado.luz-amarilla { background-color: #d97706; color: #ffffff; }
 
 
 /* DNI Input */
@@ -238,6 +243,7 @@ body {
 }
 
 .stat-verde .stat-value { color: var(--success-color); }
+.stat-azul .stat-value { color: #2563eb; }
 .stat-rojo .stat-value { color: var(--error-color); }
 
 
@@ -270,6 +276,8 @@ body {
     text-align: left;
     word-break: break-all;
     color: var(--text-main);
+    user-select: text;
+    -webkit-user-select: text;
 }
 
 .ingresos-table th {
@@ -296,6 +304,8 @@ body {
 .fila-verde { background-color: rgba(16, 185, 129, 0.15); }
 .fila-roja { background-color: rgba(239, 68, 68, 0.15); }
 .fila-gris { background-color: rgba(0, 0, 0, 0.05); }
+.fila-amarilla { background-color: rgba(245, 158, 11, 0.18) !important; }
+.fila-amarilla td:first-child { border-left: 5px solid #d97706; }
 .fila-fao td:first-child { border-left: 5px solid #f59e0b; }
 
 /* Interactive rows */

@@ -2,8 +2,8 @@
    DASHBOARD JS - Control de Acceso AOS (FIREBASE)
    ============================================= */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { getFirestore, collection, query, where, onSnapshot, getDocs, doc, getDoc, setDoc, addDoc, serverTimestamp, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getAuth, onAuthStateChanged, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+import { getFirestore, collection, query, where, onSnapshot, getDocs, doc, getDoc, setDoc, addDoc, serverTimestamp, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyBg0ht9KWgGrhGmHkT7mzCRgJ2CS6e4-lQ",
@@ -21,6 +21,7 @@ const db = getFirestore(app);
 let accesosData = [];
 let fichajesData = [];
 let auditoriaData = [];
+let currentUserRole = null;
 // Eliminamos REFRESH_INTERVAL porque ahora es Tiempo Real!
 
 // --- Inicialización ---
@@ -37,15 +38,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const userDoc = await getDoc(doc(db, "usuarios", user.uid));
             if (userDoc.exists()) {
                 const data = userDoc.data();
+                currentUserRole = data.rol;
+
+                // Solo supervisores y super_admin pueden ingresar al Dashboard
                 if (data.rol !== 'supervisor' && data.rol !== 'super_admin') {
-                    alert("Acceso denegado. No tienes permisos de supervisor.");
+                    alert("Acceso denegado. No tienes permisos para acceder al dashboard.");
                     window.location.href = '/scan.html';
+                    return;
                 }
                 
-                // Solo el Super Admin puede ver y crear usuarios
-                if (data.rol !== 'super_admin') {
-                    const tabUsuarios = document.querySelector('.dash-tab[data-tab="usuarios"]');
-                    if(tabUsuarios) tabUsuarios.style.display = 'none';
+                // CONTROL DE PRIVILEGIOS EXCLUSIVOS:
+                // Solo Roberto ('super_admin') puede ver y gestionar "Usuarios" y "Shoppings"
+                const isSuperAdmin = (data.rol === 'super_admin');
+                document.querySelectorAll('.super-admin-only').forEach(el => {
+                    el.style.display = isSuperAdmin ? '' : 'none';
+                });
+
+                if (isSuperAdmin) {
+                    initCentros();
+                    initUsuarios();
                 }
             } else {
                 signOut(auth);
@@ -65,6 +76,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     initFilters();
     initAuditoria();
+    initCierresJornada();
+    initExcepciones();
     initConfig();
     loadDashboardData();
 });
@@ -75,10 +88,14 @@ document.addEventListener('DOMContentLoaded', () => {
 function initTabs() {
     document.querySelectorAll('.dash-tab').forEach(tab => {
         tab.addEventListener('click', () => {
+            const target = tab.dataset.tab;
+            if ((target === 'usuarios' || target === 'shoppings') && currentUserRole !== 'super_admin') {
+                return;
+            }
             document.querySelectorAll('.dash-tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.dash-panel').forEach(p => p.classList.add('hidden'));
             tab.classList.add('active');
-            const panelId = 'panel-' + tab.dataset.tab;
+            const panelId = 'panel-' + target;
             const panel = document.getElementById(panelId);
             if (panel) panel.classList.remove('hidden');
         });
@@ -160,16 +177,23 @@ function updateStatsUI(entradas, salidas, rechazos) {
     document.getElementById('statSalidas').textContent = salidas;
     document.getElementById('statRechazos').textContent = rechazos;
     
-    // Escuchar live_stats desde Firebase en vez del servidor local
-    const docRef = doc(db, 'config', 'live_stats');
-    onSnapshot(docRef, (docSnap) => {
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            const statAdentro = document.getElementById('statAdentro');
-            if (statAdentro) {
-                statAdentro.textContent = data.total_adentro || 0;
-            }
+    // Escuchar la coleccion estado_adentro en tiempo real para poblar la grilla y el contador
+    const estadoAdentroRef = collection(db, 'estado_adentro');
+    onSnapshot(estadoAdentroRef, (snapshot) => {
+        const statAdentro = document.getElementById('statAdentro');
+        if (statAdentro) {
+            statAdentro.textContent = snapshot.size;
         }
+
+        let personas = [];
+        snapshot.forEach((doc) => {
+            personas.push(doc.data());
+        });
+        
+        // Ordenar alfabeticamente por nombre
+        personas.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+        
+        renderPersonasAdentro(personas);
     });
     
     const now = new Date();
@@ -286,12 +310,513 @@ function renderPersonasAdentro(personas) {
         return `<div class="persona-card">
             <div class="persona-icon ${iconClass}">${icon}</div>
             <div class="persona-info">
-                <span class="persona-dni">${p.dni}</span>
+                <span class="persona-dni" title="DNI: ${p.dni || p.DNI || 'Desconocido'}">${p.nombre || p.Nombre || p.DNI || p.dni || 'Sin nombre'}</span>
                 <span class="persona-tipo">${p.tipo_permiso}</span>
             </div>
         </div>`;
     }).join('');
 }
+
+// =============================================
+// HISTORIAL DE CIERRES DE JORNADA (AUDITORÍA)
+// =============================================
+let cierresJornadaCache = [];
+
+function initCierresJornada() {
+    const q = query(collection(db, 'cierres_jornada'));
+    onSnapshot(q, (snapshot) => {
+        cierresJornadaCache = [];
+        snapshot.forEach(docSnap => {
+            const data = docSnap.data();
+            data.id = docSnap.id;
+            cierresJornadaCache.push(data);
+        });
+
+        // Ordenar descendente (más recientes primero)
+        cierresJornadaCache.sort((a, b) => {
+            const fechaA = (a.fecha || '') + ' ' + (a.hora || '');
+            const fechaB = (b.fecha || '') + ' ' + (b.hora || '');
+            return fechaB.localeCompare(fechaA);
+        });
+
+        renderCierresJornada();
+    });
+
+    // Eventos de modal detalle
+    const closeModal = document.getElementById('closeModalDetalleCierre');
+    const btnCerrarModal = document.getElementById('btnCerrarModalDetalle');
+    const modal = document.getElementById('modalDetalleCierre');
+
+    const ocultarModal = () => {
+        if (modal) modal.style.display = 'none';
+    };
+
+    if (closeModal) closeModal.onclick = ocultarModal;
+    if (btnCerrarModal) btnCerrarModal.onclick = ocultarModal;
+    window.addEventListener('click', (e) => {
+        if (e.target === modal) ocultarModal();
+    });
+}
+
+function renderCierresJornada() {
+    const tbody = document.getElementById('bodyCierresJornada');
+    if (!tbody) return;
+
+    if (cierresJornadaCache.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No hay registros de cierre de jornada aún.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = cierresJornadaCache.map(c => {
+        const cant = c.total_quedaron_adentro || (c.personas_adentro ? c.personas_adentro.length : 0);
+        const cantBadge = cant > 0 
+            ? `<span style="background:#ef4444; color:white; padding:3px 8px; border-radius:12px; font-weight:600; font-size:0.85rem;">${cant} personas</span>`
+            : `<span style="background:#10b981; color:white; padding:3px 8px; border-radius:12px; font-weight:600; font-size:0.85rem;">0 personas (Limpio)</span>`;
+
+        return `<tr>
+            <td><strong>${c.fecha || '-'}</strong></td>
+            <td>${c.hora || '-'}</td>
+            <td>${c.operario_email || 'Garita'}</td>
+            <td>${cantBadge}</td>
+            <td style="max-width:250px; font-style:italic; color:var(--dash-text-muted);">${c.observacion || '-'}</td>
+            <td>
+                <button class="dash-btn dash-btn-sm" onclick="window.verDetalleCierre('${c.id}')" style="background:var(--dash-primary); color:white; padding:4px 10px; font-size:0.8rem;">
+                    <span class="material-icons" style="font-size:16px;">visibility</span> Auditar Personas
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+window.verDetalleCierre = function(cierreId) {
+    const cierre = cierresJornadaCache.find(x => x.id === cierreId);
+    if (!cierre) return;
+
+    const modal = document.getElementById('modalDetalleCierre');
+    const subtitulo = document.getElementById('detalleCierreSubtitulo');
+    const tbody = document.getElementById('bodyDetalleCierrePersonas');
+
+    if (subtitulo) {
+        subtitulo.innerHTML = `Cierre del <strong>${cierre.fecha} a las ${cierre.hora}</strong> por <strong>${cierre.operario_email}</strong>. Observación: <em>"${cierre.observacion || 'Sin observaciones'}"</em>`;
+    }
+
+    const personas = cierre.personas_adentro || [];
+    if (personas.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state" style="text-align:center; padding:2rem;">No había personas dentro al momento del cierre. Todo en orden.</td></tr>';
+    } else {
+        tbody.innerHTML = personas.map(p => `
+            <tr>
+                <td><strong>${p.dni || '-'}</strong></td>
+                <td>${p.nombre || '-'}</td>
+                <td>${p.hora_ingreso || '-'}</td>
+                <td><span class="persona-tipo" style="font-size:0.8rem;">${p.tipo_permiso || '-'}</span></td>
+                <td>${p.local || '-'}</td>
+            </tr>
+        `).join('');
+    }
+
+    if (modal) modal.style.display = 'flex';
+};
+
+// =============================================
+// GESTIÓN DE CENTROS COMERCIALES (SHOPPINGS)
+// =============================================
+let centrosCache = [];
+
+function initCentros() {
+    const bodyCentros = document.getElementById('bodyCentros');
+    const badgeTotal = document.getElementById('badgeTotalCentros');
+    const selectCentroUsuario = document.getElementById('newUserCentro');
+    if (!bodyCentros) return;
+
+    onSnapshot(collection(db, "centros"), (snapshot) => {
+        centrosCache = [];
+        if (snapshot.empty) {
+            bodyCentros.innerHTML = '<tr><td colspan="6" class="empty-state">No hay centros comerciales registrados.</td></tr>';
+            if (badgeTotal) badgeTotal.textContent = '0 sedes';
+            if (selectCentroUsuario) {
+                selectCentroUsuario.innerHTML = '<option value="al_oeste">Al Oeste Shopping</option>';
+            }
+            return;
+        }
+
+        if (badgeTotal) badgeTotal.textContent = `${snapshot.size} sede${snapshot.size === 1 ? '' : 's'}`;
+
+        let html = '';
+        let optionsHtml = '';
+
+        snapshot.forEach(docSnap => {
+            const c = docSnap.data();
+            const id = docSnap.id;
+            centrosCache.push({ id, ...c });
+            const nombre = c.nombre || id;
+            const direccion = c.direccion || '-';
+            const irsaId = c.irsa_id || '-';
+            const activo = c.activo !== false;
+
+            const estadoBadge = activo 
+                ? '<span class="badge badge-success"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:4px;"></span>Activo</span>'
+                : '<span class="badge badge-danger"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:4px;"></span>Inactivo</span>';
+
+            const toggleBtnText = activo ? 'Desactivar' : 'Activar';
+
+            html += `
+                <tr data-id="${id}">
+                    <td><strong>${escapeHtml(nombre)}</strong></td>
+                    <td><code>${escapeHtml(id)}</code></td>
+                    <td>${escapeHtml(direccion)}</td>
+                    <td>${escapeHtml(irsaId)}</td>
+                    <td>${estadoBadge}</td>
+                    <td style="text-align: right;">
+                        <div style="display: inline-flex; gap: 6px; justify-content: flex-end;">
+                            <button class="dash-btn" style="${activo ? 'background: rgba(255,255,255,0.08); border: 1px solid var(--dash-border); color: var(--dash-text);' : 'background: rgba(52, 211, 153, 0.15); color: var(--dash-success); border: 1px solid rgba(52, 211, 153, 0.3);'} font-size: 0.75rem; padding: 4px 8px;" onclick="window.toggleEstadoCentro('${id}', ${activo})">
+                                ${toggleBtnText}
+                            </button>
+                            <button class="dash-btn" style="background: rgba(248, 113, 113, 0.15); color: var(--dash-danger); border: 1px solid rgba(248, 113, 113, 0.3); font-size: 0.75rem; padding: 4px 8px;" onclick="window.eliminarCentroDoc('${id}', '${escapeHtml(nombre)}')">
+                                <span class="material-icons" style="font-size: 1rem;">delete</span>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+
+            optionsHtml += `<option value="${id}">${escapeHtml(nombre)}</option>`;
+        });
+
+        bodyCentros.innerHTML = html;
+        if (selectCentroUsuario) {
+            selectCentroUsuario.innerHTML = optionsHtml;
+        }
+
+        // Si ya hay usuarios cargados, refrescar sus nombres de centro
+        if (typeof renderUsuariosConCentros === 'function') {
+            renderUsuariosConCentros();
+        }
+    }, (error) => {
+        console.error("Error al cargar centros:", error);
+        bodyCentros.innerHTML = `<tr><td colspan="6" class="empty-state" style="color:var(--dash-danger);">Error: ${error.message}</td></tr>`;
+    });
+}
+
+window.autoGenerarCodigoCentro = function(nombre) {
+    const idInput = document.getElementById('newCentroId');
+    if (!idInput) return;
+    const slug = nombre
+        .toLowerCase()
+        .trim()
+        .replace(/[áàäâ]/g, 'a')
+        .replace(/[éèëê]/g, 'e')
+        .replace(/[íìïî]/g, 'i')
+        .replace(/[óòöô]/g, 'o')
+        .replace(/[úùüû]/g, 'u')
+        .replace(/ñ/g, 'n')
+        .replace(/[^a-z0-9]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+    idInput.value = slug;
+};
+
+window.crearNuevoCentro = async function(event) {
+    if (event) event.preventDefault();
+    const nombreInput = document.getElementById('newCentroNombre');
+    const idInput = document.getElementById('newCentroId');
+    const dirInput = document.getElementById('newCentroDireccion');
+    const irsaInput = document.getElementById('newCentroIrsaId');
+    const msgEl = document.getElementById('msgCrearCentro');
+    const btn = document.getElementById('btnCrearCentro');
+
+    const nombre = nombreInput ? nombreInput.value.trim() : '';
+    const id = idInput ? idInput.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_') : '';
+    const direccion = dirInput ? dirInput.value.trim() : '';
+    const irsaId = irsaInput ? irsaInput.value.trim() : '';
+
+    if (!nombre || !id) {
+        msgEl.style.color = 'var(--dash-danger)';
+        msgEl.textContent = 'El nombre y código del centro son obligatorios.';
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-icons rotating">sync</span> Guardando...';
+    }
+    msgEl.style.color = 'var(--dash-info)';
+    msgEl.textContent = 'Guardando centro comercial en la nube...';
+
+    try {
+        await setDoc(doc(db, "centros", id), {
+            id: id,
+            nombre: nombre,
+            direccion: direccion,
+            irsa_id: irsaId,
+            activo: true,
+            creado_el: serverTimestamp()
+        }, { merge: true });
+
+        msgEl.style.color = 'var(--dash-success)';
+        msgEl.textContent = `¡Shopping "${nombre}" registrado con éxito!`;
+
+        if (nombreInput) nombreInput.value = '';
+        if (idInput) idInput.value = '';
+        if (dirInput) dirInput.value = '';
+        if (irsaInput) irsaInput.value = '';
+
+        setTimeout(() => {
+            if (msgEl && msgEl.textContent.includes('éxito')) {
+                msgEl.textContent = '';
+            }
+        }, 5000);
+    } catch(err) {
+        console.error("Error al registrar centro:", err);
+        msgEl.style.color = 'var(--dash-danger)';
+        msgEl.textContent = 'Error: ' + err.message;
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-icons">add_business</span> Registrar Shopping';
+        }
+    }
+};
+
+window.toggleEstadoCentro = async function(id, currentActivo) {
+    try {
+        await updateDoc(doc(db, "centros", id), {
+            activo: !currentActivo
+        });
+    } catch(err) {
+        alert("Error al actualizar estado del centro: " + err.message);
+    }
+};
+
+window.eliminarCentroDoc = async function(id, nombre) {
+    if (!confirm(`¿Está seguro de eliminar el shopping "${nombre}"? Esta acción no se puede deshacer.`)) {
+        return;
+    }
+    try {
+        await deleteDoc(doc(db, "centros", id));
+    } catch(err) {
+        alert("Error al eliminar shopping: " + err.message);
+    }
+};
+
+// =============================================
+// GESTIÓN DE USUARIOS
+// =============================================
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+let secondaryAuthInstance = null;
+function getSecondaryAuth() {
+    if (!secondaryAuthInstance) {
+        const secondaryApp = initializeApp(firebaseConfig, "SecondaryAuthApp");
+        secondaryAuthInstance = getAuth(secondaryApp);
+    }
+    return secondaryAuthInstance;
+}
+
+let rawUsuariosDocs = [];
+
+function renderUsuariosConCentros() {
+    const bodyUsuarios = document.getElementById('bodyUsuarios');
+    const badgeTotal = document.getElementById('badgeTotalUsuarios');
+    if (!bodyUsuarios) return;
+
+    if (rawUsuariosDocs.length === 0) {
+        bodyUsuarios.innerHTML = '<tr><td colspan="6" class="empty-state">No hay usuarios registrados.</td></tr>';
+        if (badgeTotal) badgeTotal.textContent = '0 usuarios';
+        return;
+    }
+
+    if (badgeTotal) badgeTotal.textContent = `${rawUsuariosDocs.length} usuario${rawUsuariosDocs.length === 1 ? '' : 's'}`;
+
+    let html = '';
+    rawUsuariosDocs.forEach(docSnap => {
+        const u = docSnap.data();
+        const uid = docSnap.id;
+        const email = u.email || 'Sin correo';
+        const nombre = u.nombre || '-';
+        const activo = u.activo !== false;
+        const rol = u.rol || 'acceso_principal';
+        const centroId = u.centro_id || 'al_oeste';
+
+        // Buscar nombre amigable del shopping
+        const centroEncontrado = centrosCache.find(c => c.id === centroId);
+        const centroNombre = centroEncontrado ? centroEncontrado.nombre : (centroId === 'al_oeste' ? 'Al Oeste Shopping' : centroId);
+
+        let rolBadge = '';
+        switch(rol) {
+            case 'super_admin':
+                rolBadge = '<span class="badge badge-warning">Super Admin</span>';
+                break;
+            case 'supervisor':
+                rolBadge = '<span class="badge" style="background: var(--dash-purple-glow); color: var(--dash-purple); border: 1px solid rgba(167, 139, 250, 0.3);">Supervisor</span>';
+                break;
+            case 'acceso_principal':
+                rolBadge = '<span class="badge badge-info">Garita Principal</span>';
+                break;
+            case 'acceso_satelite':
+                rolBadge = '<span class="badge badge-info" style="opacity: 0.8;">Garita Satélite</span>';
+                break;
+            default:
+                rolBadge = `<span class="badge badge-info">${rol}</span>`;
+        }
+
+        const estadoBadge = activo 
+            ? '<span class="badge badge-success"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:4px;"></span>Activo</span>'
+            : '<span class="badge badge-danger"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:4px;"></span>Inactivo</span>';
+
+        const toggleBtnText = activo ? 'Desactivar' : 'Activar';
+
+        html += `
+            <tr data-uid="${uid}">
+                <td><strong>${escapeHtml(email)}</strong></td>
+                <td>${escapeHtml(nombre)}</td>
+                <td>${rolBadge}</td>
+                <td><span class="badge" style="background: rgba(255,255,255,0.06); border: 1px solid var(--dash-border); color: var(--dash-text); text-transform:none;">${escapeHtml(centroNombre)}</span></td>
+                <td>${estadoBadge}</td>
+                <td style="text-align: right;">
+                    <div style="display: inline-flex; gap: 6px; justify-content: flex-end;">
+                        <button class="dash-btn" style="${activo ? 'background: rgba(255,255,255,0.08); border: 1px solid var(--dash-border); color: var(--dash-text);' : 'background: rgba(52, 211, 153, 0.15); color: var(--dash-success); border: 1px solid rgba(52, 211, 153, 0.3);'} font-size: 0.75rem; padding: 4px 8px;" onclick="window.toggleEstadoUsuario('${uid}', ${activo})">
+                            ${toggleBtnText}
+                        </button>
+                        <button class="dash-btn" style="background: rgba(248, 113, 113, 0.15); color: var(--dash-danger); border: 1px solid rgba(248, 113, 113, 0.3); font-size: 0.75rem; padding: 4px 8px;" onclick="window.eliminarUsuarioDoc('${uid}', '${escapeHtml(email)}')">
+                            <span class="material-icons" style="font-size: 1rem;">delete</span>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    bodyUsuarios.innerHTML = html;
+}
+
+function initUsuarios() {
+    const bodyUsuarios = document.getElementById('bodyUsuarios');
+    if (!bodyUsuarios) return;
+
+    onSnapshot(collection(db, "usuarios"), (snapshot) => {
+        rawUsuariosDocs = snapshot.docs;
+        renderUsuariosConCentros();
+    }, (error) => {
+        console.error("Error al cargar usuarios:", error);
+        bodyUsuarios.innerHTML = `<tr><td colspan="6" class="empty-state" style="color:var(--dash-danger);">Error al cargar usuarios: ${error.message}</td></tr>`;
+    });
+}
+
+window.toggleEstadoUsuario = async function(uid, currentActivo) {
+    try {
+        await updateDoc(doc(db, "usuarios", uid), {
+            activo: !currentActivo
+        });
+    } catch(err) {
+        alert("Error al actualizar estado del usuario: " + err.message);
+    }
+};
+
+window.eliminarUsuarioDoc = async function(uid, email) {
+    if (!confirm(`¿Está seguro de eliminar el usuario "${email}" del sistema? Esta acción no se puede deshacer.`)) {
+        return;
+    }
+    try {
+        await deleteDoc(doc(db, "usuarios", uid));
+    } catch(err) {
+        alert("Error al eliminar usuario: " + err.message);
+    }
+};
+
+window.crearNuevoUsuario = async function(event) {
+    if (event) event.preventDefault();
+    const nombreInput = document.getElementById('newUserName');
+    const emailInput = document.getElementById('newUserEmail');
+    const passInput = document.getElementById('newUserPassword');
+    const roleInput = document.getElementById('newUserRole');
+    const centroInput = document.getElementById('newUserCentro');
+    const msgEl = document.getElementById('msgCrearUsuario');
+    const btn = document.getElementById('btnCrearUsuario');
+
+    const nombre = nombreInput ? nombreInput.value.trim() : '';
+    const email = emailInput ? emailInput.value.trim() : '';
+    const password = passInput ? passInput.value : '';
+    const rol = roleInput ? roleInput.value : 'acceso_principal';
+    const centroId = centroInput ? centroInput.value : 'al_oeste';
+
+    if (!email || !password || !rol) {
+        msgEl.style.color = 'var(--dash-danger)';
+        msgEl.textContent = 'Por favor complete todos los campos obligatorios.';
+        return;
+    }
+
+    if (password.length < 6) {
+        msgEl.style.color = 'var(--dash-danger)';
+        msgEl.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-icons rotating">sync</span> Creando usuario...';
+    }
+    msgEl.style.color = 'var(--dash-info)';
+    msgEl.textContent = 'Creando usuario y credenciales en Firebase...';
+
+    try {
+        const secAuth = getSecondaryAuth();
+        const userCredential = await createUserWithEmailAndPassword(secAuth, email, password);
+        const newUid = userCredential.user.uid;
+
+        // Inmediatamente desconectar la sesión secundaria para mantener limpia la sesión principal
+        await signOut(secAuth);
+
+        // Guardar documento de rol y perfil en Firestore con centro_id
+        await setDoc(doc(db, "usuarios", newUid), {
+            email: email,
+            nombre: nombre || email.split('@')[0],
+            rol: rol,
+            activo: true,
+            centro_id: centroId,
+            creado_el: serverTimestamp()
+        });
+
+        msgEl.style.color = 'var(--dash-success)';
+        msgEl.textContent = `¡Usuario "${email}" creado exitosamente!`;
+
+        if (nombreInput) nombreInput.value = '';
+        if (emailInput) emailInput.value = '';
+        if (passInput) passInput.value = '';
+
+        setTimeout(() => {
+            if (msgEl && msgEl.textContent.includes('exitosamente')) {
+                msgEl.textContent = '';
+            }
+        }, 5000);
+
+    } catch (e) {
+        console.error("Error al crear usuario:", e);
+        msgEl.style.color = 'var(--dash-danger)';
+        if (e.code === 'auth/email-already-in-use') {
+            msgEl.textContent = 'Error: El correo ya se encuentra en uso por otra cuenta.';
+        } else if (e.code === 'auth/invalid-email') {
+            msgEl.textContent = 'Error: El formato de correo es inválido.';
+        } else if (e.code === 'auth/weak-password') {
+            msgEl.textContent = 'Error: La contraseña es demasiado débil (mínimo 6 caracteres).';
+        } else {
+            msgEl.textContent = 'Error al crear usuario: ' + e.message;
+        }
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-icons">add_circle</span> Crear Usuario';
+        }
+    }
+};
 
 // =============================================
 // FILTROS
@@ -322,8 +847,8 @@ function initAuditoria() {
 }
 
 async function buscarAuditoria() {
-    const desde = document.getElementById('auditDesde').value;
-    const hasta = document.getElementById('auditHasta').value;
+    let desde = document.getElementById('auditDesde').value;
+    let hasta = document.getElementById('auditHasta').value;
     const tipo = document.getElementById('auditTipo').value;
 
     if (!desde || !hasta) {
@@ -331,27 +856,67 @@ async function buscarAuditoria() {
         return;
     }
 
+    if (desde > hasta) {
+        const tmp = desde;
+        desde = hasta;
+        hasta = tmp;
+        document.getElementById('auditDesde').value = desde;
+        document.getElementById('auditHasta').value = hasta;
+    }
+
     const btn = document.getElementById('btnBuscarAudit');
     btn.disabled = true;
     btn.innerHTML = '<span class="material-icons">hourglass_top</span> Buscando...';
 
     try {
-        const res = await fetch(`/api/dashboard/auditoria?desde=${desde}&hasta=${hasta}&tipo=${tipo}`);
-        const data = await res.json();
+        let records = [];
 
-        if (data.success) {
-            auditoriaData = data.records;
-            renderAuditoria(tipo);
-
-            const info = document.getElementById('auditResultInfo');
-            info.style.display = 'flex';
-            info.innerHTML = `<span class="material-icons">info</span> ${data.total} registros encontrados — Período: ${data.periodo}`;
+        if (tipo === 'fichajes') {
+            try {
+                const qFichajes = query(
+                    collection(db, "fichajes"),
+                    where("Fecha", ">=", desde),
+                    where("Fecha", "<=", hasta)
+                );
+                const snap = await getDocs(qFichajes);
+                snap.forEach(d => records.push({ id: d.id, ...d.data() }));
+                records.sort((a, b) => {
+                    const dtA = (a.Fecha || '') + ' ' + (a.Hora_Entrada || a.hora_entrada || '00:00:00');
+                    const dtB = (b.Fecha || '') + ' ' + (b.Hora_Entrada || b.hora_entrada || '00:00:00');
+                    return dtB.localeCompare(dtA);
+                });
+            } catch (errFich) {
+                console.warn('Colección fichajes no disponible en Firestore:', errFich);
+                records = [];
+            }
         } else {
-            alert(data.message);
+            // Accesos en Firestore
+            const qAccesos = query(
+                collection(db, "accesos"),
+                where("Fecha", ">=", desde),
+                where("Fecha", "<=", hasta)
+            );
+            const snap = await getDocs(qAccesos);
+            snap.forEach(d => records.push({ id: d.id, ...d.data() }));
+
+            records.sort((a, b) => {
+                const dtA = (a.Fecha || '') + ' ' + (a.Hora_Ingreso || a.Hora_Salida || a.hora || '00:00:00');
+                const dtB = (b.Fecha || '') + ' ' + (b.Hora_Ingreso || b.Hora_Salida || b.hora || '00:00:00');
+                return dtB.localeCompare(dtA);
+            });
+        }
+
+        auditoriaData = records;
+        renderAuditoria(tipo);
+
+        const info = document.getElementById('auditResultInfo');
+        if (info) {
+            info.style.display = 'flex';
+            info.innerHTML = `<span class="material-icons">info</span> ${records.length} registros encontrados — Período: ${desde} al ${hasta}`;
         }
     } catch (e) {
-        console.error('Error en auditoría:', e);
-        alert('Error al buscar registros');
+        console.error('Error en auditoría Firestore:', e);
+        alert('Error al buscar registros en Firebase: ' + (e.message || e));
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<span class="material-icons">search</span> Buscar';
@@ -363,7 +928,7 @@ function renderAuditoria(tipo) {
     const tbody = document.getElementById('bodyAuditoria');
 
     if (auditoriaData.length === 0) {
-        thead.innerHTML = '<tr><th colspan="7" class="empty-state">No se encontraron registros para el período seleccionado</th></tr>';
+        thead.innerHTML = '<tr><th colspan="9" class="empty-state">No se encontraron registros para el período seleccionado</th></tr>';
         tbody.innerHTML = '';
         return;
     }
@@ -376,14 +941,14 @@ function renderAuditoria(tipo) {
         tbody.innerHTML = auditoriaData.map(r => `<tr>
             <td>${r.Fecha || ''}</td>
             <td><strong>${r.DNI || ''}</strong></td>
-            <td>${r['Nombre y Apellido'] || ''}</td>
-            <td>${r.Hora_Entrada || ''}</td>
-            <td>${r.Hora_Salida || '—'}</td>
+            <td>${r['Nombre y Apellido'] || r.nombre || ''}</td>
+            <td>${r.Hora_Entrada || r.hora_entrada || ''}</td>
+            <td>${r.Hora_Salida || r.hora_salida || '—'}</td>
         </tr>`).join('');
     } else {
         thead.innerHTML = `<tr>
             <th>Fecha</th><th>Hora</th><th>DNI</th><th>Nombre</th>
-            <th>Evento</th><th>Tipo Permiso</th><th>Resultado</th>
+            <th>Evento</th><th>Tipo Permiso</th><th>Local/Destino</th><th>Resultado</th><th>Observaciones / Nota</th>
         </tr>`;
         tbody.innerHTML = auditoriaData.map(r => {
             const resultado = (r.Resultado || '').toUpperCase();
@@ -391,14 +956,21 @@ function renderAuditoria(tipo) {
             if (resultado.includes('AUTORIZADO') || resultado === 'VERDE') badgeClass = 'badge-success';
             else if (resultado.includes('DENEGADO') || resultado === 'ROJO') badgeClass = 'badge-danger';
 
+            const comentario = r.Comentario || r.comentario || r.observacion || r.Observacion || r.motivo_rechazo || r.Motivo_Rechazo || '';
+            const comentarioHtml = comentario 
+                ? `<span style="color:#fbbf24; font-weight:500; font-size:0.85rem; display:inline-flex; align-items:center; gap:4px; background:rgba(251,191,36,0.12); padding:3px 8px; border-radius:4px; border:1px solid rgba(251,191,36,0.3);">📝 ${escapeHtml(comentario)}</span>`
+                : '<span style="color:var(--dash-text-muted); opacity:0.4;">—</span>';
+
             return `<tr>
                 <td>${r.Fecha || ''}</td>
-                <td>${r.Hora_Ingreso || r.Hora_Salida || ''}</td>
+                <td>${r.Hora_Ingreso || r.Hora_Salida || r.hora || ''}</td>
                 <td><strong>${r.DNI || ''}</strong></td>
-                <td>${r['Nombre y Apellido'] || ''}</td>
-                <td>${r.Evento || ''}</td>
-                <td>${r.Tipo_Permiso || ''}</td>
+                <td>${escapeHtml(r['Nombre y Apellido'] || r.nombre || '')}</td>
+                <td>${r.Evento || r.evento || ''}</td>
+                <td>${r.Tipo_Permiso || r.tipo_permiso || ''}</td>
+                <td>${escapeHtml(r.Local || r.local || '—')}</td>
                 <td><span class="badge ${badgeClass}">${r.Resultado || ''}</span></td>
+                <td>${comentarioHtml}</td>
             </tr>`;
         }).join('');
     }
@@ -409,17 +981,48 @@ function exportarAuditoria() {
     const hasta = document.getElementById('auditHasta').value;
     const tipo = document.getElementById('auditTipo').value;
 
-    if (!desde || !hasta) {
-        alert('Seleccioná ambas fechas primero');
+    if (!auditoriaData || auditoriaData.length === 0) {
+        alert('No hay registros cargados para exportar. Por favor seleccioná un período y hacé clic en "Buscar".');
         return;
     }
 
-    // Usar los endpoints de descarga existentes
+    let csvContent = '\uFEFF'; // BOM UTF-8 para abrir directo en Excel en Windows con tildes y caracteres en español
+
     if (tipo === 'fichajes') {
-        window.location.href = `/descargar_fichajes_fechas?desde=${desde}&hasta=${hasta}`;
+        csvContent += 'Fecha;DNI;Nombre y Apellido;Hora Entrada;Hora Salida\r\n';
+        auditoriaData.forEach(r => {
+            const fecha = `"${String(r.Fecha || '').replace(/"/g, '""')}"`;
+            const dni = `"${String(r.DNI || '').replace(/"/g, '""')}"`;
+            const nombre = `"${String(r['Nombre y Apellido'] || r.nombre || '').replace(/"/g, '""')}"`;
+            const entrada = `"${String(r.Hora_Entrada || r.hora_entrada || '').replace(/"/g, '""')}"`;
+            const salida = `"${String(r.Hora_Salida || r.hora_salida || '').replace(/"/g, '""')}"`;
+            csvContent += `${fecha};${dni};${nombre};${entrada};${salida}\r\n`;
+        });
     } else {
-        window.location.href = `/descargar_reporte_fechas?desde=${desde}&hasta=${hasta}`;
+        csvContent += 'Fecha;Hora;DNI;Nombre y Apellido;Evento;Tipo Permiso;Local;Resultado;Comentario\r\n';
+        auditoriaData.forEach(r => {
+            const fecha = `"${String(r.Fecha || '').replace(/"/g, '""')}"`;
+            const hora = `"${String(r.Hora_Ingreso || r.Hora_Salida || r.hora || '').replace(/"/g, '""')}"`;
+            const dni = `"${String(r.DNI || '').replace(/"/g, '""')}"`;
+            const nombre = `"${String(r['Nombre y Apellido'] || r.nombre || '').replace(/"/g, '""')}"`;
+            const evento = `"${String(r.Evento || r.evento || '').replace(/"/g, '""')}"`;
+            const tipoPermiso = `"${String(r.Tipo_Permiso || r.tipo_permiso || '').replace(/"/g, '""')}"`;
+            const local = `"${String(r.Local || r.local || '').replace(/"/g, '""')}"`;
+            const resultado = `"${String(r.Resultado || '').replace(/"/g, '""')}"`;
+            const comentario = `"${String(r.Comentario || r.comentario || '').replace(/"/g, '""')}"`;
+            csvContent += `${fecha};${hora};${dni};${nombre};${evento};${tipoPermiso};${local};${resultado};${comentario}\r\n`;
+        });
     }
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `auditoria_${tipo}_${desde}_al_${hasta}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 
 // =============================================
@@ -1072,10 +1675,11 @@ function renderDirectorio() {
     let html = '';
     filtered.forEach(item => {
         let vencimientoClass = '';
+        let esVencido = false;
         if (item.vence) {
             const parts = item.vence.split('/');
             if (parts.length === 3) {
-                const fVence = new Date(parts[2], parts[1]-1, parts[0]);
+                const fVence = new Date(parts[2], parts[1]-1, parts[0], 23, 59, 59);
                 const umbral = new Date(hoy);
                 if (window.diasAlertaVencimiento) {
                     umbral.setDate(umbral.getDate() + window.diasAlertaVencimiento);
@@ -1083,19 +1687,23 @@ function renderDirectorio() {
 
                 if (fVence < hoy) {
                     vencimientoClass = 'vencido-text';
+                    esVencido = true;
                 } else if (fVence <= umbral && window.diasAlertaVencimiento > 0) {
                     vencimientoClass = 'por-vencer-text';
                 }
             }
         }
         
+        const badgeClass = esVencido ? 'status-denied' : 'status-ok';
+        const badgeText = esVencido ? 'Vencido' : item.tipo;
+
         html += `
             <tr>
                 <td>${item.dni}</td>
                 <td>${item.nombre}</td>
                 <td>${item.empresa}</td>
                 <td class="${vencimientoClass}">${item.vence || 'N/A'}</td>
-                <td><span class="status-badge ${item.tipo === 'FAO' ? 'status-ok' : 'status-denied'}">${item.tipo}</span></td>
+                <td><span class="status-badge ${badgeClass}">${badgeText}</span></td>
                 <td>${item.numero || '-'}</td>
             </tr>
         `;
@@ -1125,9 +1733,21 @@ function renderTramites() {
     
     if (!tbody) return;
 
+    const hoyStr = formatDateToLocalString();
+
     let filtered = tramitesData.filter(item => {
         const matchesText = item.empresa.toLowerCase().includes(filterText) || item.id.toString().includes(filterText);
-        const matchesEstado = filterEstado === 'TODOS' || item.estado_codigo === filterEstado;
+        const fFin = item.fecha_fin ? item.fecha_fin.split('T')[0] : '';
+        const esVencido = Boolean(fFin && fFin < hoyStr);
+
+        let matchesEstado = true;
+        if (filterEstado === 'VIGENTES') {
+            matchesEstado = !esVencido && (item.estado_codigo === '6' || item.estado_codigo === '4');
+        } else if (filterEstado === 'VENCIDOS') {
+            matchesEstado = esVencido;
+        } else if (filterEstado !== 'TODOS') {
+            matchesEstado = item.estado_codigo === filterEstado;
+        }
         return matchesText && matchesEstado;
     });
 
@@ -1140,12 +1760,27 @@ function renderTramites() {
 
     let html = '';
     filtered.forEach(item => {
+        const fFin = item.fecha_fin ? item.fecha_fin.split('T')[0] : '';
+        const esVencido = Boolean(fFin && fFin < hoyStr);
+
         let badgeClass = 'status-denied';
         let estadoStr = 'Desconocido';
-        if (item.estado_codigo === '6') { badgeClass = 'status-ok'; estadoStr = 'Aprobado'; }
-        else if (item.estado_codigo === '4') { badgeClass = 'status-ok'; estadoStr = 'Aprobado Parcial'; }
-        else if (item.estado_codigo === '3') { badgeClass = ''; estadoStr = 'Enviado'; }
-        else if (item.estado_codigo === '5') { badgeClass = 'status-denied'; estadoStr = 'Requiere Cambios'; }
+        if (esVencido) {
+            badgeClass = 'status-denied';
+            estadoStr = (item.estado_codigo === '6' || item.estado_codigo === '4') ? 'Vencido' : 'Rechazado / Vencido';
+        } else if (item.estado_codigo === '6') { 
+            badgeClass = 'status-ok'; 
+            estadoStr = 'Aprobado'; 
+        } else if (item.estado_codigo === '4') { 
+            badgeClass = 'status-ok'; 
+            estadoStr = 'Aprobado Parcial'; 
+        } else if (item.estado_codigo === '3') { 
+            badgeClass = ''; 
+            estadoStr = 'Enviado'; 
+        } else if (item.estado_codigo === '5') { 
+            badgeClass = 'status-denied'; 
+            estadoStr = 'Requiere Cambios'; 
+        }
         
         let personalHtml = '';
         if (item.personal && item.personal.length > 0) {
@@ -1171,11 +1806,11 @@ function renderTramites() {
 
         html += `
             <tr class="accordion-header" onclick="toggleAccordion('accordion-${item.id}')" style="cursor: pointer;">
-                <td><span class="status-badge ${item.tipo === 'FAO' ? 'status-ok' : 'status-denied'}">${item.tipo}</span></td>
+                <td><span class="status-badge ${esVencido ? 'status-denied' : (item.tipo === 'FAO' ? 'status-ok' : 'status-denied')}">${item.tipo}</span></td>
                 <td style="font-weight: 500;">#${item.id}</td>
                 <td>${item.empresa || '-'}</td>
                 <td>${item.fecha_inicio || '-'}</td>
-                <td>${item.fecha_fin || '-'}</td>
+                <td class="${esVencido ? 'vencido-text' : ''}">${item.fecha_fin || '-'}</td>
                 <td><span class="status-badge ${badgeClass}">${estadoStr}</span></td>
                 <td style="text-align:center;"><span class="material-icons" style="font-size: 1.5rem; vertical-align: middle; color: var(--dash-primary);">expand_more</span></td>
             </tr>
@@ -1267,12 +1902,58 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnOta = document.getElementById('btnTriggerOta');
     const statusMsg = document.getElementById('workerStatusMsg');
     
+    async function callSyncIrsaCloud(payload = {}) {
+        const endpoints = [
+            'https://sync-irsa-http-sbm3jcejya-uc.a.run.app',
+            'https://us-central1-control-acceso-c2f82.cloudfunctions.net/sync_irsa_http'
+        ];
+        let lastError = null;
+        for (const url of endpoints) {
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                return data;
+            } catch (err) {
+                lastError = err;
+                console.warn(`Fallo al llamar a ${url}, intentando alternativo:`, err);
+            }
+        }
+        throw lastError;
+    }
+
     if (btnIrsa) {
-        btnIrsa.addEventListener('click', () => {
+        btnIrsa.addEventListener('click', async () => {
             const orig = '<span class="material-icons">sync</span> Extraer Nóminas IRSA Ahora';
-            sendWorkerCommand('SYNC_IRSA', btnIrsa, orig, statusMsg);
+            btnIrsa.disabled = true;
+            btnIrsa.innerHTML = '<span class="material-icons">hourglass_empty</span> Sincronizando en la nube...';
+            statusMsg.textContent = 'Conectando con la Cloud Function en Google Cloud...';
+            statusMsg.style.color = 'var(--dash-primary)';
+
+            try {
+                const data = await callSyncIrsaCloud({});
+                if (data.success) {
+                    statusMsg.textContent = data.result || 'Sincronización completada con éxito en la nube.';
+                    statusMsg.style.color = 'var(--dash-success)';
+                    loadDashboardData();
+                } else {
+                    statusMsg.textContent = 'Error: ' + (data.error || 'Falló la sincronización en la nube.');
+                    statusMsg.style.color = 'var(--dash-danger)';
+                }
+            } catch (err) {
+                console.error("Error llamando Cloud Function:", err);
+                statusMsg.textContent = 'Error de conexión con la Cloud Function: ' + (err.message || err);
+                statusMsg.style.color = 'var(--dash-danger)';
+            } finally {
+                btnIrsa.disabled = false;
+                btnIrsa.innerHTML = orig;
+            }
         });
     }
+
     
     if (btnOta) {
         btnOta.addEventListener('click', () => {
@@ -1285,47 +1966,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnManual = document.getElementById('btnManualSync');
     const manualInput = document.getElementById('manualFaoInput');
     if (btnManual && manualInput) {
-        btnManual.addEventListener('click', () => {
+        btnManual.addEventListener('click', async () => {
             const val = manualInput.value.trim();
             if(!val) {
-                alert("Por favor ingrese el número de FAO.");
+                alert("Por favor ingrese el número de Trámite (FAO o FAP).");
                 return;
             }
             const orig = '<span class="material-icons">download</span> Descarga Forzada';
-            // We need to send custom data, so we use a modified sendWorkerCommand or direct fetch
             btnManual.disabled = true;
-            btnManual.innerHTML = 'Forzando...';
-            statusMsg.textContent = 'Enviando orden a la nube...';
-            statusMsg.style.color = 'var(--dash-text-muted)';
-            
-            db.collection('system_commands').add({
-                action: 'FORCE_SYNC_FAO',
-                fao_id: val,
-                status: 'PENDING',
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            }).then(docRef => {
-                statusMsg.textContent = 'Orden en cola. El Obrero procesará la descarga en unos segundos.';
-                statusMsg.style.color = 'var(--dash-primary)';
-                
-                const unsub = db.collection('system_commands').doc(docRef.id).onSnapshot(doc => {
-                    const data = doc.data();
-                    if(data.status === 'DONE' || data.status === 'ERROR') {
-                        btnManual.disabled = false;
-                        btnManual.innerHTML = orig;
-                        statusMsg.textContent = data.result || 'Comando finalizado.';
-                        statusMsg.style.color = data.status === 'DONE' ? 'var(--dash-success)' : 'var(--dash-danger)';
-                        manualInput.value = '';
-                        unsub();
-                    } else if (data.status === 'IN_PROGRESS') {
-                        statusMsg.textContent = 'Descargando desde IRSA...';
-                    }
-                });
-            }).catch(err => {
+            btnManual.innerHTML = '<span class="material-icons rotating">sync</span> Forzando...';
+            statusMsg.textContent = `Consultando portal de IRSA para el trámite N° ${val}...`;
+            statusMsg.style.color = 'var(--dash-primary)';
+
+            try {
+                const data = await callSyncIrsaCloud({ tramite_id: val });
+                if (data.success) {
+                    statusMsg.textContent = data.result || `¡Trámite N° ${val} descargado y personas autorizadas con éxito!`;
+                    statusMsg.style.color = 'var(--dash-success)';
+                    manualInput.value = '';
+                    loadDashboardData();
+                } else {
+                    statusMsg.textContent = 'Error: ' + (data.error || 'No se pudo forzar el trámite en IRSA.');
+                    statusMsg.style.color = 'var(--dash-danger)';
+                }
+            } catch (err) {
+                console.error("Error forzando trámite en Cloud Function:", err);
+                statusMsg.textContent = 'Error de conexión con el servidor en la nube: ' + (err.message || err);
+                statusMsg.style.color = 'var(--dash-danger)';
+            } finally {
                 btnManual.disabled = false;
                 btnManual.innerHTML = orig;
-                statusMsg.textContent = 'Error: ' + err.message;
-                statusMsg.style.color = 'var(--dash-danger)';
-            });
+            }
         });
     }
 });
@@ -1739,3 +2410,246 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
+// =============================================
+// GESTIÓN Y LISTADO DE EXCEPCIONES Y NÓMINAS ESPECIALES
+// =============================================
+let excepcionesCache = [];
+
+function initExcepciones() {
+    const body = document.getElementById('bodyExcepciones');
+    const filterInput = document.getElementById('filterExcepcionesInput');
+    const filterEstado = document.getElementById('filterExcepcionesEstado');
+    const btnRefresh = document.getElementById('btnRecargarExcepciones');
+    if (!body) return;
+
+    // Escuchar nóminas en tiempo real para filtrar las excepciones
+    onSnapshot(collection(db, "nominas"), (snapshot) => {
+        excepcionesCache = [];
+        snapshot.forEach(docSnap => {
+            const data = docSnap.data();
+            const cat = String(data.categoria || data.tipo_permiso || '').toLowerCase();
+            // Filtrar solo las que corresponden a excepciones / ART / especiales
+            if (cat.includes('excep') || cat.includes('art') || cat.includes('especial')) {
+                excepcionesCache.push({
+                    id: docSnap.id,
+                    ...data
+                });
+            }
+        });
+
+        // Ordenar por fecha_vencimiento descendente (las más nuevas primero)
+        excepcionesCache.sort((a, b) => {
+            const vA = a.fecha_vencimiento || '';
+            const vB = b.fecha_vencimiento || '';
+            if (vB !== vA) return vB.localeCompare(vA);
+            return String(a.nombre || '').localeCompare(String(b.nombre || ''));
+        });
+
+        renderTablaExcepciones();
+    }, (err) => {
+        console.error("Error al escuchar excepciones en tiempo real:", err);
+        body.innerHTML = `<tr><td colspan="6" class="empty-state" style="color:var(--dash-danger);">Error al cargar excepciones: ${err.message}</td></tr>`;
+    });
+
+    if (filterInput) {
+        filterInput.addEventListener('input', renderTablaExcepciones);
+    }
+    if (filterEstado) {
+        filterEstado.addEventListener('change', renderTablaExcepciones);
+    }
+    if (btnRefresh) {
+        btnRefresh.addEventListener('click', () => {
+            btnRefresh.classList.add('rotating');
+            renderTablaExcepciones();
+            setTimeout(() => btnRefresh.classList.remove('rotating'), 600);
+        });
+    }
+}
+
+function renderTablaExcepciones() {
+    const body = document.getElementById('bodyExcepciones');
+    const badgeTotal = document.getElementById('badgeTotalExcepciones');
+    const filterInput = document.getElementById('filterExcepcionesInput');
+    const filterEstado = document.getElementById('filterExcepcionesEstado');
+    if (!body) return;
+
+    const queryText = (filterInput ? filterInput.value.toLowerCase().trim() : '');
+    const estadoFiltro = (filterEstado ? filterEstado.value : 'VIGENTES');
+    const hoy = formatDateToLocalString();
+
+    let totalVigentes = 0;
+    let totalVencidas = 0;
+
+    excepcionesCache.forEach(item => {
+        const venc = item.fecha_vencimiento || '';
+        const esVigente = venc >= hoy && item.activo !== false;
+        if (esVigente) totalVigentes++;
+        else totalVencidas++;
+    });
+
+    if (badgeTotal) {
+        badgeTotal.innerHTML = `Total: <strong>${excepcionesCache.length}</strong> (${totalVigentes} vigentes / ${totalVencidas} vencidas)`;
+    }
+
+    const filtrados = excepcionesCache.filter(item => {
+        const venc = item.fecha_vencimiento || '';
+        const esVigente = venc >= hoy && item.activo !== false;
+
+        if (estadoFiltro === 'VIGENTES' && !esVigente) return false;
+        if (estadoFiltro === 'VENCIDAS' && esVigente) return false;
+
+        if (queryText) {
+            const dni = String(item.dni || '').toLowerCase();
+            const nom = String(item.nombre || '').toLowerCase();
+            const emp = String(item.empresa || item.motivo || item.puesto_especifico || '').toLowerCase();
+            if (!dni.includes(queryText) && !nom.includes(queryText) && !emp.includes(queryText)) {
+                return false;
+            }
+        }
+        return true;
+    });
+
+    if (filtrados.length === 0) {
+        body.innerHTML = `<tr><td colspan="6" class="empty-state" style="text-align: center; padding: 2rem;">No se encontraron excepciones ${queryText || estadoFiltro !== 'TODAS' ? 'con los filtros seleccionados' : 'registradas en el sistema'}.</td></tr>`;
+        return;
+    }
+
+    body.innerHTML = filtrados.map(item => {
+        const venc = item.fecha_vencimiento || '-';
+        const esVigente = venc >= hoy && item.activo !== false;
+        const esHoy = venc === hoy;
+
+        let estadoBadge = '';
+        if (esVigente) {
+            if (esHoy) {
+                estadoBadge = '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 600;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:4px;"></span>Vence Hoy</span>';
+            } else {
+                estadoBadge = '<span class="badge" style="background: rgba(52, 211, 153, 0.15); color: var(--dash-success); border: 1px solid rgba(52, 211, 153, 0.3); font-weight: 600;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:4px;"></span>Vigente</span>';
+            }
+        } else {
+            estadoBadge = '<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: var(--dash-danger); border: 1px solid rgba(239, 68, 68, 0.3); font-weight: 600;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:4px;"></span>Vencida</span>';
+        }
+
+        const empMotivo = item.empresa || item.motivo || item.puesto_especifico || '-';
+        const nombre = item.nombre || '-';
+        const dni = item.dni || '-';
+
+        return `
+            <tr data-id="${item.id}">
+                <td><strong>${escapeHtml(dni)}</strong></td>
+                <td>${escapeHtml(nombre)}</td>
+                <td>${escapeHtml(empMotivo)}</td>
+                <td><code style="font-size:0.9rem;">${escapeHtml(venc)}</code></td>
+                <td>${estadoBadge}</td>
+                <td style="text-align: right;">
+                    <div style="display: inline-flex; gap: 6px; justify-content: flex-end;">
+                        <button class="dash-btn" style="background: rgba(59, 130, 246, 0.15); color: var(--dash-primary); border: 1px solid rgba(59, 130, 246, 0.3); font-size: 0.75rem; padding: 5px 10px;" onclick="window.abrirModalEditarExcepcion('${item.id}')" title="Modificar fecha de vigencia o datos">
+                            <span class="material-icons" style="font-size: 0.95rem;">edit</span> Modificar
+                        </button>
+                        <button class="dash-btn" style="background: rgba(239, 68, 68, 0.15); color: var(--dash-danger); border: 1px solid rgba(239, 68, 68, 0.3); font-size: 0.75rem; padding: 5px 10px;" onclick="window.eliminarExcepcionDoc('${item.id}', '${escapeHtml(nombre)}', '${escapeHtml(dni)}')" title="Eliminar excepción">
+                            <span class="material-icons" style="font-size: 0.95rem;">delete</span> Borrar
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+window.abrirModalEditarExcepcion = function(docId) {
+    const item = excepcionesCache.find(x => x.id === docId);
+    if (!item) return;
+
+    document.getElementById('editExcepcionDocId').value = docId;
+    document.getElementById('editExcepcionDni').value = item.dni || '';
+    document.getElementById('editExcepcionNombre').value = item.nombre || '';
+    document.getElementById('editExcepcionEmpresa').value = item.empresa || item.motivo || item.puesto_especifico || '';
+    document.getElementById('editExcepcionVencimiento').value = item.fecha_vencimiento || '';
+
+    const statusEl = document.getElementById('editExcepcionStatus');
+    if (statusEl) {
+        statusEl.style.display = 'none';
+        statusEl.textContent = '';
+    }
+
+    const modal = document.getElementById('modalEditarExcepcion');
+    if (modal) modal.style.display = 'flex';
+};
+
+window.cerrarModalEditarExcepcion = function() {
+    const modal = document.getElementById('modalEditarExcepcion');
+    if (modal) modal.style.display = 'none';
+};
+
+window.guardarEdicionExcepcion = async function() {
+    const docId = document.getElementById('editExcepcionDocId').value;
+    const nombre = document.getElementById('editExcepcionNombre').value.trim();
+    const empresa = document.getElementById('editExcepcionEmpresa').value.trim();
+    const fechaVenc = document.getElementById('editExcepcionVencimiento').value;
+    const statusEl = document.getElementById('editExcepcionStatus');
+    const btnGuardar = document.getElementById('btnGuardarEditExcepcion');
+
+    if (!docId) return;
+    if (!nombre || !empresa || !fechaVenc) {
+        if (statusEl) {
+            statusEl.style.display = 'block';
+            statusEl.style.color = 'var(--dash-danger)';
+            statusEl.textContent = 'Por favor complete todos los campos.';
+        }
+        return;
+    }
+
+    if (btnGuardar) {
+        btnGuardar.disabled = true;
+        btnGuardar.innerHTML = '<span class="material-icons rotating">sync</span> Guardando...';
+    }
+
+    try {
+        await updateDoc(doc(db, "nominas", docId), {
+            nombre: nombre,
+            empresa: empresa,
+            fecha_vencimiento: fechaVenc,
+            activo: true
+        });
+
+        if (statusEl) {
+            statusEl.style.display = 'block';
+            statusEl.style.color = 'var(--dash-success)';
+            statusEl.textContent = '¡Excepción modificada con éxito!';
+        }
+
+        setTimeout(() => {
+            window.cerrarModalEditarExcepcion();
+            if (btnGuardar) {
+                btnGuardar.disabled = false;
+                btnGuardar.innerHTML = '<span class="material-icons">save</span> Guardar Cambios';
+            }
+        }, 600);
+    } catch (e) {
+        console.error("Error al modificar excepción:", e);
+        if (statusEl) {
+            statusEl.style.display = 'block';
+            statusEl.style.color = 'var(--dash-danger)';
+            statusEl.textContent = 'Error: ' + e.message;
+        }
+        if (btnGuardar) {
+            btnGuardar.disabled = false;
+            btnGuardar.innerHTML = '<span class="material-icons">save</span> Guardar Cambios';
+        }
+    }
+};
+
+window.eliminarExcepcionDoc = async function(docId, nombre, dni) {
+    if (!confirm(`¿Está seguro de eliminar la excepción para:\n\n${nombre} (DNI ${dni})?\n\nEsta persona dejará de estar autorizada para ingresar.`)) {
+        return;
+    }
+
+    try {
+        await deleteDoc(doc(db, "nominas", docId));
+    } catch (e) {
+        console.error("Error al eliminar excepción:", e);
+        alert("Error al eliminar excepción: " + e.message);
+    }
+};
+

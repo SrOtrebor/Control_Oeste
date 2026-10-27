@@ -89,6 +89,34 @@ body {
     border: 1px solid rgba(74, 144, 226, 0.3);
 }
 
+.dash-btn-plano {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.18) 0%, rgba(139, 92, 246, 0.22) 100%);
+    color: #93c5fd;
+    border: 1px solid rgba(147, 197, 253, 0.4);
+    padding: 0.28rem 0.85rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+
+.dash-btn-plano:hover {
+    background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+    color: #ffffff;
+    border-color: #60a5fa;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+}
+
+.dash-btn-plano .material-icons {
+    font-size: 1.05rem;
+}
+
 .dash-header-right {
     display: flex;
     align-items: center;

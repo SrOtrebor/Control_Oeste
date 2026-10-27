@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (record.Resultado === 'AUTORIZADO') row.classList.add('fila-verde');
                     else if (record.Resultado === 'DENEGADO') row.classList.add('fila-roja');
                     if (record.Tipo_Permiso === 'FAO') row.classList.add('fila-fao');
+                    if (record.Alerta_Vencimiento) row.classList.add('fila-amarilla');
 
                     const timeString = record.Hora_Ingreso || record.Hora_Salida || '';
                     row.insertCell().textContent = timeString.split(' ')[1] || timeString;
@@ -53,11 +54,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     row.insertCell().textContent = record.Evento || '';
                     row.insertCell().textContent = record.Num_Permiso || '';
                     row.insertCell().textContent = record.Local || '';
+                    
+                    // Columna 7: Vencimiento
+                    const cellVenc = row.insertCell();
+                    if (record.Vence) {
+                        cellVenc.innerHTML = record.Alerta_Vencimiento ? `<span style="color: #d97706; font-weight: bold;">⚠️ ${record.Vence}</span>` : record.Vence;
+                    } else {
+                        cellVenc.textContent = '-';
+                    }
                 });
             } else {
                 const row = targetTableBody.insertRow();
                 const cell = row.insertCell(0);
-                cell.colSpan = 6;
+                cell.colSpan = 7;
                 cell.textContent = data.message || 'No hay registros para mostrar.';
                 cell.style.textAlign = 'center';
             }
@@ -73,7 +82,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/get_dynamic_stats');
             const stats = await response.json();
             statTotalAdentroEl.textContent = stats.total_adentro;
-            document.getElementById('statPermitidos').textContent = stats.permitidos;
+            document.getElementById('statPermitidos').textContent = stats.permitidos !== undefined ? stats.permitidos : (stats.entradas || 0);
+            const statSalidas = document.getElementById('statSalidas');
+            if (statSalidas) statSalidas.textContent = stats.salidas || 0;
             document.getElementById('statRechazados').textContent = stats.rechazados;
         } catch (error) {
             console.error("Error al actualizar estadísticas:", error);
@@ -118,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (newMode === 'salida') {
             document.body.classList.add('salida-visita-mode');
             header.classList.add('salida-visita-mode');
-            headerTitle.textContent = 'Salida de Visita';
+            headerTitle.textContent = 'Registrar Salida';
         }
 
         if (dniInput) dniInput.focus();
@@ -220,11 +231,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 let color = 'roja';
                 if (data.acceso === 'PERMITIDO') {
-                    // Si el modo es 'salida', usamos un color neutro, si no, verde.
-                    color = (currentMode === 'salida') ? 'gris' : 'verde';
+                    if (data.alerta_vencimiento) {
+                        color = 'amarilla';
+                    } else {
+                        color = (currentMode === 'salida') ? 'gris' : 'verde';
+                    }
                 }
 
-                const vencimientoTexto = data.vence && data.vence !== 'N/A' ? (data.acceso === 'PERMITIDO' ? `Vence: ${data.vence}`: `Vencido el: ${data.vence}`) : '';
+                const vencimientoTexto = data.vence && data.vence !== 'N/A' 
+                    ? (data.acceso === 'PERMITIDO' 
+                        ? (data.alerta_vencimiento ? `⚠️ ATENCIÓN: Vence el ${data.vence} (${data.dias_para_vencer === 0 ? 'HOY' : (data.dias_para_vencer === 1 ? 'MAÑANA' : `en ${data.dias_para_vencer} días`)})` : `Vence: ${data.vence}`) 
+                        : `Vencido el: ${data.vence}`) 
+                    : '';
                 mostrarResultado(color, data.mensaje, data.nombre, data.local, data.tarea, vencimientoTexto);
 
             } catch (error) {
@@ -246,7 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
             infoTarea.textContent = '';
             infoVence.textContent = '';
 
-            if (colorClass === 'verde' || colorClass === 'gris' || (nombre && nombre !== 'No Encontrado')) {
+            if (colorClass === 'verde' || colorClass === 'amarilla' || colorClass === 'gris' || (nombre && nombre !== 'No Encontrado')) {
                 infoLocal.textContent = localInfo && localInfo !== 'N/A' ? `${localInfo}` : '';
                 infoTarea.textContent = tareaInfo && tareaInfo !== 'N/A' ? `${tareaInfo}` : '';
                 infoVence.textContent = venceInfo;
@@ -255,9 +273,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         dniInput.focus();
         dniInput.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
+            if (event.key === 'Enter' || event.keyCode === 13) {
                 event.preventDefault();
                 handleDniScan();
+            }
+        });
+
+        // Mantener siempre el foco en el campo DNI para escaneos continuos
+        document.addEventListener('click', (e) => {
+            const tag = e.target ? e.target.tagName.toLowerCase() : '';
+            if (tag !== 'input' && tag !== 'textarea' && tag !== 'select' && tag !== 'button' && 
+                !e.target.closest('.modal') && !e.target.closest('.modal-content') && !e.target.closest('.modal-overlay')) {
+                const input = document.getElementById('dniInput');
+                if (input) input.focus();
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            const active = document.activeElement;
+            const tag = active ? active.tagName.toLowerCase() : '';
+            if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') {
+                const input = document.getElementById('dniInput');
+                if (input) {
+                    input.focus();
+                }
             }
         });
         

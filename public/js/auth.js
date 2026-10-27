@@ -87,8 +87,6 @@ async function checkRoleAndRedirect(uid) {
             // Redirección según rol
             switch(userData.rol) {
                 case 'super_admin':
-                    window.location.href = '/maestro.html';
-                    break;
                 case 'supervisor':
                     window.location.href = '/dashboard.html';
                     break;

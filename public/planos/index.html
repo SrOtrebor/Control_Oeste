@@ -1,0 +1,2335 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Oeste Outlet - Navegador de Planos y Ubicaciones CRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #0a0e17;
+      --bg-panel: rgba(15, 23, 42, 0.85);
+      --bg-card: rgba(22, 30, 46, 0.75);
+      --bg-card-hover: rgba(30, 41, 64, 0.95);
+      --bg-card-selected: rgba(37, 99, 235, 0.2);
+      --border-card: rgba(255, 255, 255, 0.08);
+      --border-selected: #3b82f6;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --accent-glow: rgba(59, 130, 246, 0.4);
+      --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.4);
+      --warning: #f59e0b;
+      --warning-glow: rgba(245, 158, 11, 0.4);
+      --purple: #a855f7;
+      --purple-glow: rgba(168, 85, 247, 0.4);
+      --cyan: #06b6d4;
+      --cyan-glow: rgba(6, 182, 212, 0.4);
+      --rose: #f43f5e;
+      --rose-glow: rgba(244, 63, 94, 0.4);
+      --slate: #64748b;
+      --tray-bg: rgba(15, 23, 42, 0.94);
+      --modal-bg: #0f172a;
+      --glass-blur: blur(16px);
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+      --shadow-lg: 0 16px 36px -8px rgba(0, 0, 0, 0.6);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-full: 9999px;
+      --transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    [data-theme="light"] {
+      --bg-main: #f1f5f9;
+      --bg-panel: rgba(255, 255, 255, 0.92);
+      --bg-card: rgba(255, 255, 255, 0.9);
+      --bg-card-hover: rgba(255, 255, 255, 1);
+      --bg-card-selected: rgba(239, 246, 255, 0.95);
+      --border-card: rgba(0, 0, 0, 0.08);
+      --border-selected: #2563eb;
+      --text-main: #0f172a;
+      --text-muted: #475569;
+      --text-dim: #94a3b8;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-glow: rgba(37, 99, 235, 0.25);
+      --tray-bg: rgba(255, 255, 255, 0.95);
+      --modal-bg: #ffffff;
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 16px 36px -8px rgba(0, 0, 0, 0.15);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      line-height: 1.5;
+    }
+
+    /* Top Navigation Header */
+    header {
+      flex-shrink: 0;
+      z-index: 50;
+      backdrop-filter: var(--glass-blur);
+      background: rgba(10, 14, 23, 0.85);
+      border-bottom: 1px solid var(--border-card);
+      padding: 0.75rem 1.25rem;
+    }
+
+    [data-theme="light"] header {
+      background: rgba(248, 250, 252, 0.9);
+    }
+
+    .header-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: var(--radius-md);
+      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 800;
+      font-size: 1.15rem;
+      box-shadow: 0 4px 14px var(--accent-glow);
+    }
+
+    .brand-text h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .badge-crm {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: var(--radius-full);
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .brand-text p {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .header-center {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 3px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-card);
+    }
+
+    [data-theme="light"] .header-center {
+      background: #e2e8f0;
+    }
+
+    .view-tab {
+      padding: 0.45rem 0.9rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      border: none;
+      background: transparent;
+      transition: var(--transition);
+    }
+
+    .view-tab.active {
+      background: var(--accent);
+      color: white;
+      box-shadow: 0 2px 8px var(--accent-glow);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.45rem 0.85rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-card);
+      background: var(--bg-card);
+      color: var(--text-main);
+      cursor: pointer;
+      transition: var(--transition);
+      user-select: none;
+    }
+
+    .btn:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+      box-shadow: 0 4px 14px var(--accent-glow);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    /* Main Workspace */
+    #app-workspace {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* MAP VIEW CONTAINER */
+    #map-view-container {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Left Sidebar: Location Navigator */
+    .map-sidebar {
+      width: 380px;
+      max-width: 420px;
+      min-width: 320px;
+      height: 100%;
+      background: var(--bg-panel);
+      backdrop-filter: var(--glass-blur);
+      border-right: 1px solid var(--border-card);
+      display: flex;
+      flex-direction: column;
+      z-index: 20;
+      box-shadow: 4px 0 20px rgba(0, 0, 0, 0.2);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .sidebar-header {
+      padding: 1rem 1.15rem 0.75rem;
+      border-bottom: 1px solid var(--border-card);
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      flex-shrink: 0;
+    }
+
+    .search-box {
+      position: relative;
+      width: 100%;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 0.65rem 0.85rem 0.65rem 2.4rem;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-md);
+      color: var(--text-main);
+      font-size: 0.88rem;
+      font-family: inherit;
+      outline: none;
+      transition: var(--transition);
+    }
+
+    [data-theme="light"] .search-input {
+      background: #f8fafc;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+      background: rgba(0, 0, 0, 0.4);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 0.85rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dim);
+      pointer-events: none;
+      font-size: 0.95rem;
+    }
+
+    .search-clear {
+      position: absolute;
+      right: 0.75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 2px;
+      display: none;
+    }
+
+    /* Floor selection pills */
+    .floor-tabs {
+      display: flex;
+      gap: 0.35rem;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .floor-tabs::-webkit-scrollbar {
+      display: none;
+    }
+
+    .floor-btn {
+      flex: 1;
+      padding: 0.45rem 0.5rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-card);
+      background: rgba(0, 0, 0, 0.2);
+      color: var(--text-muted);
+      cursor: pointer;
+      text-align: center;
+      white-space: nowrap;
+      transition: var(--transition);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+
+    [data-theme="light"] .floor-btn {
+      background: #f1f5f9;
+    }
+
+    .floor-btn:hover {
+      background: var(--bg-card-hover);
+      color: var(--text-main);
+    }
+
+    .floor-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+      box-shadow: 0 2px 8px var(--accent-glow);
+    }
+
+    .floor-count {
+      font-size: 0.65rem;
+      opacity: 0.75;
+      font-weight: 500;
+    }
+
+    /* Filter Chips in Sidebar */
+    .category-chips {
+      display: flex;
+      gap: 0.35rem;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      scrollbar-width: none;
+    }
+
+    .category-chips::-webkit-scrollbar {
+      display: none;
+    }
+
+    .cat-chip {
+      padding: 0.25rem 0.6rem;
+      border-radius: var(--radius-full);
+      font-size: 0.72rem;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-muted);
+      border: 1px solid var(--border-card);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: var(--transition);
+    }
+
+    .cat-chip:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+    }
+
+    .cat-chip.active {
+      background: rgba(59, 130, 246, 0.2);
+      color: #93c5fd;
+      border-color: var(--accent);
+    }
+
+    /* Location List in Sidebar */
+    .sidebar-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.5rem 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .sidebar-list::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .sidebar-list::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+    }
+
+    .loc-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.65rem 0.85rem;
+      border-radius: var(--radius-md);
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      cursor: pointer;
+      transition: var(--transition);
+      position: relative;
+    }
+
+    .loc-item:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(255, 255, 255, 0.18);
+      transform: translateX(2px);
+    }
+
+    .loc-item.selected {
+      background: var(--bg-card-selected);
+      border-color: var(--border-selected);
+    }
+
+    .loc-item.active-spotlight {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35);
+      background: rgba(14, 165, 233, 0.18);
+    }
+
+    .loc-badge {
+      width: 34px;
+      height: 34px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+      flex-shrink: 0;
+      color: white;
+    }
+
+    .loc-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .loc-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .loc-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .loc-sub {
+      font-size: 0.73rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 1px;
+    }
+
+    .loc-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      flex-shrink: 0;
+    }
+
+    .btn-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-card);
+      background: transparent;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: var(--transition);
+    }
+
+    .btn-icon:hover {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    .custom-check {
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      border: 1px solid var(--text-dim);
+      background: transparent;
+      cursor: pointer;
+      position: relative;
+      transition: var(--transition);
+    }
+
+    .custom-check:checked {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .custom-check:checked::after {
+      content: '✓';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 800;
+    }
+
+    /* RIGHT SIDE: Interactive Plan Stage */
+    .map-stage {
+      flex: 1;
+      height: 100%;
+      position: relative;
+      background: #05070d;
+      overflow: hidden;
+      cursor: grab;
+      user-select: none;
+    }
+
+    .map-stage:active {
+      cursor: grabbing;
+    }
+
+    /* The viewport containing transformed pan/zoom element */
+    #map-viewport {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform-origin: 0 0;
+      will-change: transform;
+    }
+
+    .blueprint-wrapper {
+      position: relative;
+      display: inline-block;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .blueprint-img {
+      display: block;
+      max-width: none;
+      pointer-events: none;
+    }
+
+    /* Markers Overlay on top of blueprint image */
+    .pins-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    /* Individual Pin Marker */
+    .plan-pin {
+      position: absolute;
+      pointer-events: auto;
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+      z-index: 10;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), z-index 0.2s;
+    }
+
+    .plan-pin:hover {
+      transform: translate(-50%, -50%) scale(1.25);
+      z-index: 35;
+    }
+
+    .pin-circle {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      color: white;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+      border: 2px solid #ffffff;
+      transition: var(--transition);
+    }
+
+    .pin-label {
+      position: absolute;
+      top: 26px;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid var(--border-card);
+      color: #f8fafc;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: var(--radius-sm);
+      pointer-events: none;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      display: block;
+    }
+
+    [data-theme="light"] .pin-label {
+      background: rgba(255, 255, 255, 0.95);
+      color: #0f172a;
+    }
+
+    .pins-labels-hidden .pin-label {
+      display: none !important;
+    }
+
+    /* Category colors for pins */
+    .pin-cat-retail .pin-circle { background: #10b981; }
+    .pin-cat-gastro .pin-circle { background: #f97316; }
+    .pin-cat-entert .pin-circle { background: #a855f7; }
+    .pin-cat-stand .pin-circle { background: #06b6d4; }
+    .pin-cat-vacant .pin-circle { background: #eab308; }
+    .pin-cat-service .pin-circle { background: #3b82f6; }
+    .pin-cat-tech .pin-circle { background: #64748b; }
+
+    /* Selected pin style */
+    .plan-pin.is-selected .pin-circle {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.5);
+      transform: scale(1.15);
+    }
+
+    /* Active Spotlight Ripple Pulse */
+    .plan-pin.is-spotlight {
+      z-index: 40;
+    }
+
+    .plan-pin.is-spotlight .pin-circle {
+      animation: pulse-ring 1.5s infinite;
+      border-color: #38bdf8;
+      box-shadow: 0 0 20px #38bdf8;
+    }
+
+    .spotlight-beacon {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      border: 3px solid #38bdf8;
+      background: rgba(56, 189, 248, 0.2);
+      pointer-events: none;
+      animation: ripple-beacon 1.5s infinite ease-out;
+    }
+
+    @keyframes ripple-beacon {
+      0% {
+        transform: translate(-50%, -50%) scale(0.3);
+        opacity: 1;
+      }
+      100% {
+        transform: translate(-50%, -50%) scale(1.8);
+        opacity: 0;
+      }
+    }
+
+    @keyframes pulse-ring {
+      0%, 100% {
+        transform: scale(1.2);
+      }
+      50% {
+        transform: scale(1.4);
+      }
+    }
+
+    /* Floating Map Tool Controls */
+    .map-controls {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      z-index: 25;
+    }
+
+    .controls-panel {
+      background: var(--bg-panel);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-md);
+      padding: 0.35rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .ctrl-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1.05rem;
+      transition: var(--transition);
+    }
+
+    .ctrl-btn:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-card);
+    }
+
+    .ctrl-btn.active {
+      background: var(--accent);
+      color: white;
+    }
+
+    /* Sector Jump bar at bottom of map */
+    .sector-jumper {
+      position: absolute;
+      bottom: 5.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-panel);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-full);
+      padding: 0.35rem 0.6rem;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      z-index: 25;
+      box-shadow: var(--shadow-lg);
+      max-width: 90%;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .sector-jumper::-webkit-scrollbar {
+      display: none;
+    }
+
+    .jump-btn {
+      padding: 0.3rem 0.75rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      border-radius: var(--radius-full);
+      border: 1px solid transparent;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .jump-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: var(--text-main);
+    }
+
+    /* Floating Location Card Inspector */
+    #location-inspector {
+      position: absolute;
+      bottom: 5.5rem;
+      right: 1.25rem;
+      width: 320px;
+      background: var(--bg-panel);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-lg);
+      padding: 1.15rem;
+      z-index: 30;
+      box-shadow: var(--shadow-lg);
+      display: none;
+      animation: slideUp 0.25s ease-out;
+    }
+
+    #location-inspector.active {
+      display: block;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .inspector-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .inspector-title {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: var(--text-main);
+      line-height: 1.25;
+    }
+
+    .inspector-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--accent);
+      background: rgba(59, 130, 246, 0.12);
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      display: inline-block;
+      margin-top: 3px;
+    }
+
+    .inspector-close {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: 2px;
+      transition: var(--transition);
+    }
+
+    .inspector-close:hover {
+      color: var(--text-main);
+    }
+
+    .inspector-details {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid var(--border-card);
+    }
+
+    .inspector-detail-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .detail-label {
+      color: var(--text-dim);
+    }
+
+    .detail-val {
+      font-weight: 600;
+      color: var(--text-main);
+      text-align: right;
+    }
+
+    .inspector-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    /* GRID & TABLE VIEW WRAPPERS */
+    #catalog-view-container, #table-view-container {
+      width: 100%;
+      height: 100%;
+      overflow-y: auto;
+      padding: 1.5rem;
+      display: none;
+    }
+
+    .catalog-wrapper {
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    /* Cards Grid */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+      gap: 1rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-lg);
+      padding: 1.1rem;
+      transition: var(--transition);
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .card:hover {
+      background: var(--bg-card-hover);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .card.selected {
+      background: var(--bg-card-selected);
+      border-color: var(--border-selected);
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+
+    .card-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .card-name {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text-main);
+      line-height: 1.3;
+    }
+
+    .card-category {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: auto;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border-card);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: var(--radius-full);
+    }
+
+    .status-badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .status-badge.ocupado {
+      background: rgba(16, 185, 129, 0.12);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .status-badge.ocupado::before { background: #10b981; }
+
+    .status-badge.vacante {
+      background: rgba(245, 158, 11, 0.12);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    .status-badge.vacante::before { background: #f59e0b; }
+
+    .status-badge.servicio, .status-badge.reserva, .status-badge.pendiente {
+      background: rgba(59, 130, 246, 0.12);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+    .status-badge.servicio::before, .status-badge.reserva::before, .status-badge.pendiente::before { background: #3b82f6; }
+
+    /* Table Styles */
+    .table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-lg);
+      overflow-x: auto;
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+
+    th {
+      background: rgba(0, 0, 0, 0.25);
+      padding: 0.85rem 1rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-card);
+      white-space: nowrap;
+    }
+
+    [data-theme="light"] th {
+      background: #f1f5f9;
+    }
+
+    td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--border-card);
+      color: var(--text-main);
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    tr.selected td {
+      background: var(--bg-card-selected);
+    }
+
+    /* Bottom Multi-Select Floating Tray */
+    .selection-tray {
+      position: fixed;
+      bottom: 1.25rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(120%);
+      background: var(--tray-bg);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-full);
+      padding: 0.65rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.6);
+      z-index: 60;
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .selection-tray.active {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .tray-count {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .tray-counter-badge {
+      background: var(--accent);
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+    }
+
+    .tray-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* Modal / Drawer */
+    .drawer-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 90;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    .drawer-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 520px;
+      max-width: 95vw;
+      height: 100%;
+      background: var(--modal-bg);
+      border-left: 1px solid var(--border-card);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: -10px 0 40px rgba(0, 0, 0, 0.6);
+    }
+
+    .drawer.active {
+      transform: translateX(0);
+    }
+
+    .drawer-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border-card);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .format-selector {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .format-btn {
+      padding: 0.45rem 0.85rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-card);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .format-btn.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    .output-textarea {
+      width: 100%;
+      height: 240px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-md);
+      padding: 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      color: var(--text-main);
+      outline: none;
+      resize: vertical;
+    }
+
+    [data-theme="light"] .output-textarea {
+      background: #f8fafc;
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      top: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(-100px);
+      background: #0f172a;
+      border: 1px solid var(--accent);
+      color: #f8fafc;
+      padding: 0.65rem 1.25rem;
+      border-radius: var(--radius-full);
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      z-index: 120;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .toast.active {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Responsive */
+    @media (max-width: 860px) {
+      .map-sidebar {
+        width: 100%;
+        max-width: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 45%;
+        z-index: 25;
+        border-right: none;
+        border-bottom: 1px solid var(--border-card);
+      }
+      .map-stage {
+        height: 55%;
+        margin-top: 45%;
+      }
+      .sector-jumper {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-icon">OO</div>
+        <div class="brand-text">
+          <h1>Oeste Outlet <span class="badge-crm">Maestro CRM</span></h1>
+          <p>Explorador Planimétrico y Gestor de Ubicaciones</p>
+        </div>
+      </div>
+
+      <!-- View Switcher -->
+      <div class="header-center">
+        <button class="view-tab active" id="tab-map" data-view="map">
+          <span>🗺️</span> Plano Interactivo
+        </button>
+        <button class="view-tab" id="tab-grid" data-view="grid">
+          <span>📋</span> Tarjetas
+        </button>
+        <button class="view-tab" id="tab-table" data-view="table">
+          <span>📑</span> Tabla CRM
+        </button>
+      </div>
+
+      <!-- Actions -->
+      <div class="header-actions">
+        <button class="btn btn-primary" id="btn-open-panel">
+          <span>⚡</span> Panel CRM (<span id="header-sel-count">0</span>)
+        </button>
+        <button class="btn" id="btn-theme" title="Cambiar tema">🌓</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- App Workspace -->
+  <main id="app-workspace">
+
+    <!-- 1. INTERACTIVE MAP VIEW -->
+    <div id="map-view-container">
+      
+      <!-- Left Sidebar: Location Search & Navigation -->
+      <aside class="map-sidebar">
+        <div class="sidebar-header">
+          <!-- Search Box -->
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="search-input" id="sidebar-search" placeholder="Buscar marca, código o local (ej: Nike, KFC)..." autocomplete="off">
+            <button class="search-clear" id="sidebar-search-clear">✕</button>
+          </div>
+
+          <!-- Floor Selector Tabs -->
+          <div class="floor-tabs">
+            <button class="floor-btn active" data-floor="pb">
+              <span>🏢 Planta Baja</span>
+              <span class="floor-count">121 locs</span>
+            </button>
+            <button class="floor-btn" data-floor="1n">
+              <span>🧗 1er Nivel</span>
+              <span class="floor-count">11 locs</span>
+            </button>
+            <button class="floor-btn" data-floor="1ss">
+              <span>🚗 1° Subsuelo</span>
+              <span class="floor-count">3 locs</span>
+            </button>
+            <button class="floor-btn" data-floor="2ss">
+              <span>🚙 2° Subsuelo</span>
+              <span class="floor-count">3 locs</span>
+            </button>
+          </div>
+
+          <!-- Category Quick Filters -->
+          <div class="category-chips">
+            <button class="cat-chip active" data-cat="all">Todos</button>
+            <button class="cat-chip" data-cat="locales">Locales</button>
+            <button class="cat-chip" data-cat="gastro">Gastronomía</button>
+            <button class="cat-chip" data-cat="stands">Stands/Góndolas</button>
+            <button class="cat-chip" data-cat="vacante">Vacantes</button>
+            <button class="cat-chip" data-cat="servicios">Baños/Servicios</button>
+          </div>
+        </div>
+
+        <!-- Scrollable Locations List -->
+        <div class="sidebar-list" id="sidebar-locations-list">
+          <!-- Rendered dynamically -->
+        </div>
+      </aside>
+
+      <!-- Right Blueprint Canvas Stage -->
+      <div class="map-stage" id="map-stage">
+        
+        <!-- Viewport for smooth CSS transforms (Pan & Zoom) -->
+        <div id="map-viewport">
+          <div class="blueprint-wrapper" id="blueprint-wrapper">
+            <!-- Floor Plan Image -->
+            <img id="blueprint-img" class="blueprint-img" src="planta_baja_150dpi.png" alt="Plano Oeste Outlet">
+            <!-- Pins & Markers Overlay -->
+            <div id="pins-layer" class="pins-layer">
+              <!-- Dynamically rendered pins -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Floating Map Tool Controls -->
+        <div class="map-controls">
+          <div class="controls-panel">
+            <button class="ctrl-btn" id="ctrl-zoom-in" title="Acercar (+)">＋</button>
+            <button class="ctrl-btn" id="ctrl-zoom-out" title="Alejar (-)">－</button>
+            <button class="ctrl-btn" id="ctrl-reset" title="Restablecer plano (100%)">🎯</button>
+            <button class="ctrl-btn" id="ctrl-fit" title="Ajustar a pantalla">🔲</button>
+          </div>
+          <div class="controls-panel">
+            <button class="ctrl-btn" id="ctrl-toggle-labels" title="Mostrar/Ocultar Nombres">🏷️</button>
+            <button class="ctrl-btn" id="ctrl-toggle-pins" title="Mostrar/Ocultar Pines">📍</button>
+          </div>
+        </div>
+
+        <!-- Sector Quick Jumper (PB Mall Wings) -->
+        <div class="sector-jumper" id="sector-jumper">
+          <span style="font-size:0.75rem; color:var(--text-dim); margin-right:4px;">Saltar a:</span>
+          <button class="jump-btn" data-x="18" data-y="70">👈 Ala Oeste (Miniso/Puma)</button>
+          <button class="jump-btn" data-x="48" data-y="70">🏛️ Mall Central (Adidas/Selú)</button>
+          <button class="jump-btn" data-x="62" data-y="74">⚡ Nike Store</button>
+          <button class="jump-btn" data-x="80" data-y="50">🍔 Patio de Comidas</button>
+          <button class="jump-btn" data-x="71" data-y="40">🎬 Cines Showcase</button>
+          <button class="jump-btn" data-x="40" data-y="45">🚚 Carga y Bauleras</button>
+        </div>
+
+        <!-- Floating Inspector Popup Card -->
+        <div id="location-inspector">
+          <div class="inspector-header">
+            <div>
+              <div class="inspector-title" id="insp-name">Nombre Local</div>
+              <div class="inspector-code" id="insp-code">N00L00</div>
+            </div>
+            <button class="inspector-close" id="insp-close">✕</button>
+          </div>
+          <div class="inspector-details">
+            <div class="inspector-detail-row">
+              <span class="detail-label">Nivel / Planta:</span>
+              <span class="detail-val" id="insp-level">Planta Baja</span>
+            </div>
+            <div class="inspector-detail-row">
+              <span class="detail-label">Categoría:</span>
+              <span class="detail-val" id="insp-category">Indumentaria</span>
+            </div>
+            <div class="inspector-detail-row">
+              <span class="detail-label">Estado:</span>
+              <span class="detail-val" id="insp-status">Ocupado</span>
+            </div>
+            <div class="inspector-detail-row">
+              <span class="detail-label">Detalles / Ubicación:</span>
+              <span class="detail-val" id="insp-details" style="font-size:0.75rem;">-</span>
+            </div>
+          </div>
+          <div class="inspector-actions">
+            <button class="btn btn-sm btn-primary" id="insp-copy" style="flex:1;">
+              <span>📋</span> Copiar Ficha
+            </button>
+            <button class="btn btn-sm" id="insp-toggle-select" style="flex:1;">
+              <span>✓</span> Seleccionar
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- 2. CATALOG GRID VIEW -->
+    <div id="catalog-view-container">
+      <div class="catalog-wrapper">
+        <div class="cards-grid" id="cards-grid">
+          <!-- Dynamically generated cards -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. TABLE CRM VIEW -->
+    <div id="table-view-container">
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th width="40"><input type="checkbox" id="th-checkbox" class="custom-check"></th>
+              <th>Código</th>
+              <th>Nombre Comercial</th>
+              <th>Nivel</th>
+              <th>Categoría</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            <!-- Dynamically generated rows -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Bottom Floating Selection Tray -->
+  <div class="selection-tray" id="selection-tray">
+    <div class="tray-count">
+      <span class="tray-counter-badge" id="tray-count-num">0</span>
+      <span>seleccionados</span>
+    </div>
+    <div class="tray-actions">
+      <button class="btn btn-sm" id="tray-copy-names">Copiar Nombres</button>
+      <button class="btn btn-sm" id="tray-copy-codes">Códigos y Nombres</button>
+      <button class="btn btn-sm btn-primary" id="tray-open-panel">Exportar / Formatos</button>
+      <button class="btn btn-sm" id="tray-clear" style="color:var(--rose);">Limpiar</button>
+    </div>
+  </div>
+
+  <!-- Format Generator Drawer -->
+  <div class="drawer-overlay" id="drawer-overlay"></div>
+  <aside class="drawer" id="drawer">
+    <div class="drawer-header">
+      <h2>Generador CRM y Exportación</h2>
+      <button class="btn btn-sm" id="drawer-close-btn">✕</button>
+    </div>
+    <div class="drawer-body">
+      <p style="font-size:0.85rem; color:var(--text-muted);">
+        Formato de exportación para las <strong id="drawer-sel-num" style="color:var(--text-main);">0</strong> ubicaciones seleccionadas:
+      </p>
+
+      <div class="format-selector" id="format-selector">
+        <button class="format-btn active" data-format="names-comma">Nombres (Comas)</button>
+        <button class="format-btn" data-format="names-line">Nombres (Por línea)</button>
+        <button class="format-btn" data-format="code-name">Código - Nombre</button>
+        <button class="format-btn" data-format="markdown-table">Tabla Markdown</button>
+        <button class="format-btn" data-format="csv">Excel CSV</button>
+        <button class="format-btn" data-format="json">JSON Array</button>
+      </div>
+
+      <textarea class="output-textarea" id="output-textarea" readonly></textarea>
+
+      <div style="display:flex; gap:0.75rem;">
+        <button class="btn btn-primary" id="btn-copy-drawer-text" style="flex:1;">
+          <span>📋</span> Copiar al Portapapeles
+        </button>
+        <button class="btn" id="drawer-done-btn">Listo</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast">
+    <span>✓</span> <span id="toast-msg">Mensaje copiado</span>
+  </div>
+
+  <script>
+    // DATASET
+    const LOCATIONS = [{"id": "loc_1_N00L01", "code": "N00L01", "name": "La Perfumerie", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Belleza y Cuidado Personal", "details": "Belleza y Cuidado Personal  Planta Baja", "status": "Ocupado", "search": "n00l01 la perfumerie locales comerciales cerrados (in-line stores) belleza y cuidado personal planta baja ocupado belleza y cuidado personal  planta baja", "floor": "pb", "x": 48.41, "y": 77.7}, {"id": "loc_2_N00L02", "code": "N00L02", "name": "Soho", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Indumentaria", "details": "Indumentaria  Planta Baja", "status": "Ocupado", "search": "n00l02 soho locales comerciales cerrados (in-line stores) indumentaria planta baja ocupado indumentaria  planta baja", "floor": "pb", "x": 45.31, "y": 77.7}, {"id": "loc_3_N00L03", "code": "N00L03", "name": "Boardriders", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Deportes / Surf & Skate", "details": "Deportes / Surf & Skate  Planta Baja", "status": "Ocupado", "search": "n00l03 boardriders locales comerciales cerrados (in-line stores) deportes / surf & skate planta baja ocupado deportes / surf & skate  planta baja", "floor": "pb", "x": 42.42, "y": 77.7}, {"id": "loc_4_N00L04", "code": "N00L04", "name": "Macowens", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Indumentaria Masculina", "details": "Indumentaria Masculina  Planta Baja", "status": "Ocupado", "search": "n00l04 macowens locales comerciales cerrados (in-line stores) indumentaria masculina planta baja ocupado indumentaria masculina  planta baja", "floor": "pb", "x": 39.26, "y": 77.7}, {"id": "loc_5_N00L05", "code": "N00L05", "name": "Prüne", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Marroquinería y Calzado", "details": "Marroquinería y Calzado  Planta Baja", "status": "Ocupado", "search": "n00l05 prüne locales comerciales cerrados (in-line stores) marroquinería y calzado planta baja ocupado marroquinería y calzado  planta baja", "floor": "pb", "x": 36.4, "y": 77.7}, {"id": "loc_6_N00L06", "code": "N00L06", "name": "Equus", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Indumentaria Masculina", "details": "Indumentaria Masculina  Planta Baja", "status": "Ocupado", "search": "n00l06 equus locales comerciales cerrados (in-line stores) indumentaria masculina planta baja ocupado indumentaria masculina  planta baja", "floor": "pb", "x": 32.86, "y": 77.85}, {"id": "loc_7_N00L07", "code": "N00L07", "name": "Santa Bohemia", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Indumentaria", "details": "Indumentaria  Planta Baja", "status": "Ocupado", "search": "n00l07 santa bohemia locales comerciales cerrados (in-line stores) indumentaria planta baja ocupado indumentaria  planta baja", "floor": "pb", "x": 27.69, "y": 77.59}, {"id": "loc_8_N00L08", "code": "N00L08", "name": "Vacante", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Retail General", "details": "Retail General  Planta Baja", "status": "Vacante", "search": "n00l08 vacante locales comerciales cerrados (in-line stores) retail general planta baja vacante retail general  planta baja", "floor": "pb", "x": 24.09, "y": 77.65}, {"id": "loc_9_N00L009N00L09", "code": "N00L009 (N00L09)", "name": "Vacante", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Retail General", "details": "Retail General  Planta Baja", "status": "Vacante", "search": "n00l009 (n00l09) vacante locales comerciales cerrados (in-line stores) retail general planta baja vacante retail general  planta baja", "floor": "pb", "x": 19.28, "y": 81.41}, {"id": "loc_10_N00L010N00L10", "code": "N00L010 (N00L10)", "name": "Miniso", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Variedades / Hogar", "details": "Variedades / Hogar  Planta Baja", "status": "Ocupado", "search": "n00l010 (n00l10) miniso locales comerciales cerrados (in-line stores) variedades / hogar planta baja ocupado variedades / hogar  planta baja", "floor": "pb", "x": 10.99, "y": 80.06}, {"id": "loc_11_N00L11", "code": "N00L11", "name": "Vacante", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Retail General", "details": "Retail General  Planta Baja", "status": "Vacante", "search": "n00l11 vacante locales comerciales cerrados (in-line stores) retail general planta baja vacante retail general  planta baja", "floor": "pb", "x": 10.1, "y": 77.29}, {"id": "loc_12_N00L12", "code": "N00L12", "name": "Rusty", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Indumentaria / Urbano", "details": "Indumentaria / Urbano  Planta Baja", "status": "Ocupado", "search": "n00l12 rusty locales comerciales cerrados (in-line stores) indumentaria / urbano planta baja ocupado indumentaria / urbano  planta baja", "floor": "pb", "x": 8.67, "y": 71.72}, {"id": "loc_13_N00L13", "code": "N00L13", "name": "Puma", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Deporte / Calzado", "details": "Deporte / Calzado  Planta Baja", "status": "Ocupado", "search": "n00l13 puma locales comerciales cerrados (in-line stores) deporte / calzado planta baja ocupado deporte / calzado  planta baja", "floor": "pb", "x": 11.27, "y": 63.74}, {"id": "loc_14_N00L15", "code": "N00L15", "name": "Cristóbal Colón", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Deporte / Urbano", "details": "Deporte / Urbano  Planta Baja", "status": "Ocupado", "search": "n00l15 cristóbal colón locales comerciales cerrados (in-line stores) deporte / urbano planta baja ocupado deporte / urbano  planta baja", "floor": "pb", "x": 22.13, "y": 57.98}, {"id": "loc_15_N00L17", "code": "N00L17", "name": "Selú", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Lencería", "details": "Lencería  Planta Baja", "status": "Ocupado", "search": "n00l17 selú locales comerciales cerrados (in-line stores) lencería planta baja ocupado lencería  planta baja", "floor": "pb", "x": 25.07, "y": 61.63}, {"id": "loc_16_N00L18", "code": "N00L18", "name": "Enzo", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Indumentaria Masculina", "details": "Indumentaria Masculina  Planta Baja", "status": "Ocupado", "search": "n00l18 enzo locales comerciales cerrados (in-line stores) indumentaria masculina planta baja ocupado indumentaria masculina  planta baja", "floor": "pb", "x": 33.85, "y": 65.8}, {"id": "loc_17_N00L19", "code": "N00L19", "name": "XL", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Marroquinería", "details": "Marroquinería  Planta Baja", "status": "Ocupado", "search": "n00l19 xl locales comerciales cerrados (in-line stores) marroquinería planta baja ocupado marroquinería  planta baja", "floor": "pb", "x": 36.29, "y": 65.66}, {"id": "loc_18_N00L20", "code": "N00L20", "name": "Levi's", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Indumentaria / Denim", "details": "Indumentaria / Denim  Planta Baja", "status": "Ocupado", "search": "n00l20 levi's locales comerciales cerrados (in-line stores) indumentaria / denim planta baja ocupado indumentaria / denim  planta baja", "floor": "pb", "x": 40.59, "y": 65.66}, {"id": "loc_19_N00L21", "code": "N00L21", "name": "Cheeky", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Infantil", "details": "Infantil  Planta Baja", "status": "Ocupado", "search": "n00l21 cheeky locales comerciales cerrados (in-line stores) infantil planta baja ocupado infantil  planta baja", "floor": "pb", "x": 44.83, "y": 65.66}, {"id": "loc_20_N00L22", "code": "N00L22", "name": "Adidas", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Megatienda Deportiva", "details": "Megatienda Deportiva  Planta Baja", "status": "Ocupado", "search": "n00l22 adidas locales comerciales cerrados (in-line stores) megatienda deportiva planta baja ocupado megatienda deportiva  planta baja", "floor": "pb", "x": 49.78, "y": 61.06}, {"id": "loc_21_N00L23", "code": "N00L23", "name": "Addnice", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Calzado Deportivo Infantil", "details": "Calzado Deportivo Infantil  Planta Baja", "status": "Ocupado", "search": "n00l23 addnice locales comerciales cerrados (in-line stores) calzado deportivo infantil planta baja ocupado calzado deportivo infantil  planta baja", "floor": "pb", "x": 54.25, "y": 61.06}, {"id": "loc_22_N00L24", "code": "N00L24", "name": "Cuesta Blanca", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Indumentaria Femenina", "details": "Indumentaria Femenina  Planta Baja", "status": "Ocupado", "search": "n00l24 cuesta blanca locales comerciales cerrados (in-line stores) indumentaria femenina planta baja ocupado indumentaria femenina  planta baja", "floor": "pb", "x": 59.27, "y": 60.26}, {"id": "loc_23_N00L26", "code": "N00L26", "name": "Kevingstone", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Indumentaria Masculina", "details": "Indumentaria Masculina  Planta Baja", "status": "Ocupado", "search": "n00l26 kevingstone locales comerciales cerrados (in-line stores) indumentaria masculina planta baja ocupado indumentaria masculina  planta baja", "floor": "pb", "x": 64.6, "y": 61.06}, {"id": "loc_24_N00L27A", "code": "N00L27A", "name": "Óptica World", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Óptica y Accesorios", "details": "Óptica y Accesorios  Planta Baja", "status": "Ocupado", "search": "n00l27a óptica world locales comerciales cerrados (in-line stores) óptica y accesorios planta baja ocupado óptica y accesorios  planta baja", "floor": "pb", "x": 67.96, "y": 61.06}, {"id": "loc_25_N00L27B", "code": "N00L27B", "name": "Todo Moda", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Accesorios y Moda", "details": "Accesorios y Moda  Planta Baja", "status": "Ocupado", "search": "n00l27b todo moda locales comerciales cerrados (in-line stores) accesorios y moda planta baja ocupado accesorios y moda  planta baja", "floor": "pb", "x": 70.84, "y": 60.46}, {"id": "loc_26_N00L28", "code": "N00L28", "name": "Magic", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Gastronomía / Helados", "details": "Gastronomía / Helados  Planta Baja", "status": "Ocupado", "search": "n00l28 magic locales comerciales cerrados (in-line stores) gastronomía / helados planta baja ocupado gastronomía / helados  planta baja", "floor": "pb", "x": 75.23, "y": 62.64}, {"id": "loc_27_N00L029N00L29", "code": "N00L029 (N00L29)", "name": "Tiprendo", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Gastronomía", "details": "Gastronomía  Planta Baja", "status": "Ocupado", "search": "n00l029 (n00l29) tiprendo locales comerciales cerrados (in-line stores) gastronomía planta baja ocupado gastronomía  planta baja", "floor": "pb", "x": 79.53, "y": 62.02}, {"id": "loc_28_N00L30", "code": "N00L30", "name": "McDonald's", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Gastronomía / Fast Food", "details": "Gastronomía / Fast Food  Planta Baja", "status": "Ocupado", "search": "n00l30 mcdonald's locales comerciales cerrados (in-line stores) gastronomía / fast food planta baja ocupado gastronomía / fast food  planta baja", "floor": "pb", "x": 89.84, "y": 60.8}, {"id": "loc_29_N00L31", "code": "N00L31", "name": "Momo Store", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Multirrubro / Bazar", "details": "Multirrubro / Bazar  Planta Baja", "status": "Ocupado", "search": "n00l31 momo store locales comerciales cerrados (in-line stores) multirrubro / bazar planta baja ocupado multirrubro / bazar  planta baja", "floor": "pb", "x": 90.21, "y": 71.26}, {"id": "loc_30_N00L32", "code": "N00L32", "name": "Carrousel", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Infantil / Indumentaria", "details": "Infantil / Indumentaria  Planta Baja", "status": "Ocupado", "search": "n00l32 carrousel locales comerciales cerrados (in-line stores) infantil / indumentaria planta baja ocupado infantil / indumentaria  planta baja", "floor": "pb", "x": 84.48, "y": 73.88}, {"id": "loc_31_N00L33", "code": "N00L33", "name": "Atomik", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Calzado Infantil", "details": "Calzado Infantil  Planta Baja", "status": "Ocupado", "search": "n00l33 atomik locales comerciales cerrados (in-line stores) calzado infantil planta baja ocupado calzado infantil  planta baja", "floor": "pb", "x": 81.51, "y": 73.69}, {"id": "loc_32_N00L34", "code": "N00L34", "name": "Ver", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Indumentaria Femenina", "details": "Indumentaria Femenina  Planta Baja", "status": "Ocupado", "search": "n00l34 ver locales comerciales cerrados (in-line stores) indumentaria femenina planta baja ocupado indumentaria femenina  planta baja", "floor": "pb", "x": 78.5, "y": 73.69}, {"id": "loc_33_N00L35", "code": "N00L35", "name": "47 Street", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Indumentaria Juvenil", "details": "Indumentaria Juvenil  Planta Baja", "status": "Ocupado", "search": "n00l35 47 street locales comerciales cerrados (in-line stores) indumentaria juvenil planta baja ocupado indumentaria juvenil  planta baja", "floor": "pb", "x": 75.45, "y": 73.69}, {"id": "loc_34_N00L36", "code": "N00L36", "name": "Portsaid", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Indumentaria Femenina", "details": "Indumentaria Femenina  Planta Baja", "status": "Ocupado", "search": "n00l36 portsaid locales comerciales cerrados (in-line stores) indumentaria femenina planta baja ocupado indumentaria femenina  planta baja", "floor": "pb", "x": 72.51, "y": 73.69}, {"id": "loc_35_N00L37", "code": "N00L37", "name": "Pigmento", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Perfumería y Cosmética", "details": "Perfumería y Cosmética  Planta Baja", "status": "Ocupado", "search": "n00l37 pigmento locales comerciales cerrados (in-line stores) perfumería y cosmética planta baja ocupado perfumería y cosmética  planta baja", "floor": "pb", "x": 68.14, "y": 73.24}, {"id": "loc_36_N00L038N00L38", "code": "N00L038 (N00L38)", "name": "Nike", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja y Entrepiso", "category": "Megatienda Deportiva", "details": "Megatienda Deportiva  Planta Baja y Entrepiso", "status": "Ocupado", "search": "n00l038 (n00l38) nike locales comerciales cerrados (in-line stores) megatienda deportiva planta baja y entrepiso ocupado megatienda deportiva  planta baja y entrepiso", "floor": "pb", "x": 60.73, "y": 74.21}, {"id": "loc_37_N00L041N00L41", "code": "N00L041 (N00L41)", "name": "Vacante", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Gastronomía / Retail", "details": "Gastronomía / Retail  Planta Baja", "status": "Vacante", "search": "n00l041 (n00l41) vacante locales comerciales cerrados (in-line stores) gastronomía / retail planta baja vacante gastronomía / retail  planta baja", "floor": "pb", "x": 73.61, "y": 60.38}, {"id": "loc_38_N00L042N00L42", "code": "N00L042 (N00L42)", "name": "Quiosco 365", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Kiosco y Bebidas", "details": "Kiosco y Bebidas  Planta Baja", "status": "Ocupado", "search": "n00l042 (n00l42) quiosco 365 locales comerciales cerrados (in-line stores) kiosco y bebidas planta baja ocupado kiosco y bebidas  planta baja", "floor": "pb", "x": 70.17, "y": 58.14}, {"id": "loc_39_N00L043N00L43", "code": "N00L043 (N00L43)", "name": "Vacante", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Retail General", "details": "Retail General  Planta Baja", "status": "Vacante", "search": "n00l043 (n00l43) vacante locales comerciales cerrados (in-line stores) retail general planta baja vacante retail general  planta baja", "floor": "pb", "x": 59.27, "y": 52.28}, {"id": "loc_40_N00L044N00L44", "code": "N00L044 (N00L44)", "name": "Punto Verona", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Gastronomía", "details": "Gastronomía  Planta Baja", "status": "Ocupado", "search": "n00l044 (n00l44) punto verona locales comerciales cerrados (in-line stores) gastronomía planta baja ocupado gastronomía  planta baja", "floor": "pb", "x": 78.44, "y": 41.62}, {"id": "loc_41_N00L045N00L45", "code": "N00L045 (N00L45)", "name": "Al Amir", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Gastronomía Árabe", "details": "Gastronomía Árabe  Planta Baja", "status": "Ocupado", "search": "n00l045 (n00l45) al amir locales comerciales cerrados (in-line stores) gastronomía árabe planta baja ocupado gastronomía árabe  planta baja", "floor": "pb", "x": 81.21, "y": 42.56}, {"id": "loc_42_N00L046N00L46", "code": "N00L046 (N00L46)", "name": "KFC", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Gastronomía / Fast Food", "details": "Gastronomía / Fast Food  Planta Baja", "status": "Ocupado", "search": "n00l046 (n00l46) kfc locales comerciales cerrados (in-line stores) gastronomía / fast food planta baja ocupado gastronomía / fast food  planta baja", "floor": "pb", "x": 60.78, "y": 41.97}, {"id": "loc_43_N00L049N00L49", "code": "N00L049 (N00L49)", "name": "Burger King (BK)", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Gastronomía / Fast Food", "details": "Gastronomía / Fast Food  Planta Baja", "status": "Ocupado", "search": "n00l049 (n00l49) burger king (bk) locales comerciales cerrados (in-line stores) gastronomía / fast food planta baja ocupado gastronomía / fast food  planta baja", "floor": "pb", "x": 86.71, "y": 44.81}, {"id": "loc_44_N00L050N00L50", "code": "N00L050 (N00L50)", "name": "Betos", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Gastronomía / Lomitos", "details": "Gastronomía / Lomitos  Planta Baja", "status": "Ocupado", "search": "n00l050 (n00l50) betos locales comerciales cerrados (in-line stores) gastronomía / lomitos planta baja ocupado gastronomía / lomitos  planta baja", "floor": "pb", "x": 83.77, "y": 43.54}, {"id": "loc_45_N00L051N00L51", "code": "N00L051 (N00L51)", "name": "Showcase Cinemas", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja / Cines", "category": "Complejo de Cines", "details": "Complejo de Cines  Planta Baja / Cines", "status": "Ocupado", "search": "n00l051 (n00l51) showcase cinemas locales comerciales cerrados (in-line stores) complejo de cines planta baja / cines ocupado complejo de cines  planta baja / cines", "floor": "pb", "x": 71.02, "y": 40.69}, {"id": "loc_46_N00L052N00L52", "code": "N00L052 (N00L52)", "name": "Mostaza", "section": "Locales Comerciales Cerrados (In-Line Stores)", "level": "Planta Baja", "category": "Gastronomía / Fast Food", "details": "Gastronomía / Fast Food  Planta Baja", "status": "Ocupado", "search": "n00l052 (n00l52) mostaza locales comerciales cerrados (in-line stores) gastronomía / fast food planta baja ocupado gastronomía / fast food  planta baja", "floor": "pb", "x": 90.23, "y": 54.83}, {"id": "loc_47_ALOEN01L001", "code": "ALOE-N01L001", "name": "SmartFit", "section": "Locales en Primer Nivel y Entrepiso", "level": "1er Nivel", "category": "Gimnasio / Fitness", "details": "Gimnasio / Fitness  1er Nivel", "status": "Ocupado", "search": "aloe-n01l001 smartfit locales en primer nivel y entrepiso gimnasio / fitness 1er nivel ocupado gimnasio / fitness  1er nivel", "floor": "1n", "x": 28.0, "y": 36.0}, {"id": "loc_48_ALOEN01L002", "code": "ALOE-N01L002", "name": "Neverland", "section": "Locales en Primer Nivel y Entrepiso", "level": "1er Nivel", "category": "Centro de Entretenimiento Familiar", "details": "Centro de Entretenimiento Familiar  1er Nivel", "status": "Ocupado", "search": "aloe-n01l002 neverland locales en primer nivel y entrepiso centro de entretenimiento familiar 1er nivel ocupado centro de entretenimiento familiar  1er nivel", "floor": "1n", "x": 52.0, "y": 48.0}, {"id": "loc_49_N02ENT01", "code": "N02ENT01", "name": "Vacante", "section": "Locales en Primer Nivel y Entrepiso", "level": "Entrepiso N2 (+11.00)", "category": "Gran superficie comercial / Usos múltiples", "details": "Gran superficie comercial / Usos múltiples  Entrepiso N2 (+11.00)", "status": "Vacante", "search": "n02ent01 vacante locales en primer nivel y entrepiso gran superficie comercial / usos múltiples entrepiso n2 (+11.00) vacante gran superficie comercial / usos múltiples  entrepiso n2 (+11.00)", "floor": "1n", "x": 62.0, "y": 24.0}, {"id": "loc_50_S1LOC01", "code": "S1-LOC01", "name": "Strix By LoJack", "section": "Locales y Servicios en Subsuelos", "level": "1° Subsuelo (1SS)", "category": "Local de Servicios Vehiculares / Taller", "details": "Local de Servicios Vehiculares / Taller  1° Subsuelo (1SS)", "status": "Ocupado", "search": "s1-loc01 strix by lojack locales y servicios en subsuelos local de servicios vehiculares / taller 1° subsuelo (1ss) ocupado local de servicios vehiculares / taller  1° subsuelo (1ss)", "floor": "1ss", "x": 40.29, "y": 55.92}, {"id": "loc_51_S2AUTO01", "code": "S2-AUTO01", "name": "Autos Varios", "section": "Locales y Servicios en Subsuelos", "level": "2° Subsuelo (2SS)", "category": "Taller / Venta de Vehículos / Servicios", "details": "Taller / Venta de Vehículos / Servicios  2° Subsuelo (2SS)", "status": "Ocupado", "search": "s2-auto01 autos varios locales y servicios en subsuelos taller / venta de vehículos / servicios 2° subsuelo (2ss) ocupado taller / venta de vehículos / servicios  2° subsuelo (2ss)", "floor": "2ss", "x": 50.0, "y": 50.0}, {"id": "loc_52_N00G001", "code": "N00G001", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Rotonda Oeste con área de expansión", "status": "Vacante", "search": "n00g001 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - rotonda oeste con área de expansión", "floor": "pb", "x": 16.59, "y": 68.15}, {"id": "loc_53_N00G002", "code": "N00G002", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Rotonda Este (Food Court) con área de expansión", "status": "Vacante", "search": "n00g002 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - rotonda este (food court) con área de expansión", "floor": "pb", "x": 83.52, "y": 65.87}, {"id": "loc_54_N00G003", "code": "N00G003", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo Oeste frente a Miniso y Puma", "status": "Vacante", "search": "n00g003 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo oeste frente a miniso y puma", "floor": "pb", "x": 21.61, "y": 73.72}, {"id": "loc_55_N00G004", "code": "N00G004", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo Oeste frente a Puma", "status": "Vacante", "search": "n00g004 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo oeste frente a puma", "floor": "pb", "x": 21.59, "y": 66.62}, {"id": "loc_56_N00G005", "code": "N00G005", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo Oeste central", "status": "Vacante", "search": "n00g005 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo oeste central", "floor": "pb", "x": 23.85, "y": 73.23}, {"id": "loc_57_N00G006", "code": "N00G006", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo Oeste central frente a Cristóbal Colón", "status": "Vacante", "search": "n00g006 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo oeste central frente a cristóbal colón", "floor": "pb", "x": 24.1, "y": 66.92}, {"id": "loc_58_N00G007", "code": "N00G007", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo central", "status": "Vacante", "search": "n00g007 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo central", "floor": "pb", "x": 26.16, "y": 71.99}, {"id": "loc_59_N00G008", "code": "N00G008", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo central", "status": "Vacante", "search": "n00g008 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo central", "floor": "pb", "x": 25.9, "y": 68.43}, {"id": "loc_60_N00G009", "code": "N00G009", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo central", "status": "Vacante", "search": "n00g009 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo central", "floor": "pb", "x": 28.27, "y": 72.01}, {"id": "loc_61_N00G010", "code": "N00G010", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo central frente a Macowens", "status": "Vacante", "search": "n00g010 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo central frente a macowens", "floor": "pb", "x": 32.8, "y": 72.75}, {"id": "loc_62_N00G011", "code": "N00G011", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo central frente a Macowens / Prüne", "status": "Vacante", "search": "n00g011 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo central frente a macowens / prüne", "floor": "pb", "x": 34.5, "y": 72.75}, {"id": "loc_63_N00G012", "code": "N00G012", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo central frente a Prüne / Equus", "status": "Vacante", "search": "n00g012 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo central frente a prüne / equus", "floor": "pb", "x": 36.2, "y": 72.75}, {"id": "loc_64_N00G013", "code": "N00G013", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo central frente a Equus", "status": "Vacante", "search": "n00g013 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo central frente a equus", "floor": "pb", "x": 40.5, "y": 72.73}, {"id": "loc_65_N00G014", "code": "N00G014", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo central frente a Equus / Boardriders", "status": "Vacante", "search": "n00g014 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo central frente a equus / boardriders", "floor": "pb", "x": 42.29, "y": 72.73}, {"id": "loc_66_N00G015", "code": "N00G015", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo central", "status": "Vacante", "search": "n00g015 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo central", "floor": "pb", "x": 44.1, "y": 72.73}, {"id": "loc_67_N00G015A", "code": "N00G015A", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo intermedio", "status": "Vacante", "search": "n00g015a vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo intermedio", "floor": "pb", "x": 48.71, "y": 72.24}, {"id": "loc_68_N00G016", "code": "N00G016", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo central frente a Nike", "status": "Vacante", "search": "n00g016 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo central frente a nike", "floor": "pb", "x": 62.5, "y": 69.18}, {"id": "loc_69_N00G017", "code": "N00G017", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo central frente a Nike", "status": "Vacante", "search": "n00g017 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo central frente a nike", "floor": "pb", "x": 64.2, "y": 69.18}, {"id": "loc_70_N00G018", "code": "N00G018", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo central frente a Nike", "status": "Vacante", "search": "n00g018 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo central frente a nike", "floor": "pb", "x": 65.84, "y": 69.18}, {"id": "loc_71_N00G019", "code": "N00G019", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo central frente a Nike", "status": "Vacante", "search": "n00g019 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo central frente a nike", "floor": "pb", "x": 67.5, "y": 69.18}, {"id": "loc_72_N00G020", "code": "N00G020", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo central frente a Nike / Pigmento", "status": "Vacante", "search": "n00g020 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo central frente a nike / pigmento", "floor": "pb", "x": 69.2, "y": 69.18}, {"id": "loc_73_N00G021", "code": "N00G021", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo este frente a Pigmento", "status": "Vacante", "search": "n00g021 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo este frente a pigmento", "floor": "pb", "x": 70.8, "y": 69.18}, {"id": "loc_74_N00G022", "code": "N00G022", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo este frente a Portsaid", "status": "Vacante", "search": "n00g022 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo este frente a portsaid", "floor": "pb", "x": 72.5, "y": 69.18}, {"id": "loc_75_N00G023", "code": "N00G023", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo este frente a 47 Street", "status": "Vacante", "search": "n00g023 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo este frente a 47 street", "floor": "pb", "x": 77.2, "y": 69.03}, {"id": "loc_76_N00G024", "code": "N00G024", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Pasillo este frente a Ver", "status": "Vacante", "search": "n00g024 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - pasillo este frente a ver", "floor": "pb", "x": 79.3, "y": 69.03}, {"id": "loc_77_N00G025", "code": "N00G025", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Acceso al Patio de Comidas (Sitting General)", "status": "Vacante", "search": "n00g025 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - acceso al patio de comidas (sitting general)", "floor": "pb", "x": 83.29, "y": 60.05}, {"id": "loc_78_N00G026", "code": "N00G026", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Sector Sitting General / Food Court norte", "status": "Vacante", "search": "n00g026 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - sector sitting general / food court norte", "floor": "pb", "x": 75.03, "y": 50.71}, {"id": "loc_79_N00G027", "code": "N00G027", "name": "Vacante (Stand)", "section": "Góndolas y Stands Comerciales de Pasillo", "level": "Planta Baja", "category": "Góndola / Stand Comercial", "details": "PB - Sector Sitting General / Food Court norte", "status": "Vacante", "search": "n00g027 vacante (stand) góndolas y stands comerciales de pasillo góndola / stand comercial planta baja vacante pb - sector sitting general / food court norte", "floor": "pb", "x": 72.78, "y": 51.87}, {"id": "loc_bauleras_pb", "code": "N00BA", "name": "Baulera", "section": "Sector de Bauleras para Locatarios", "level": "Planta Baja", "category": "Baulera Depósito", "details": "Sector general de bauleras y depósitos comerciales para locatarios.", "status": "Ocupado", "search": "n00ba baulera sector de bauleras para locatarios baulera depósito planta baja ocupado sector general de bauleras y depósitos comerciales para locatarios.", "floor": "pb", "x": 55.75, "y": 45.0}, {"id": "loc_92_MOD-NV01", "code": "MOD-NV01", "name": "Módulo No Verificado", "section": "Módulos Singulares", "level": "Planta Baja", "category": "Módulo Central", "details": "Pasillo central pendiente de definición", "status": "Pendiente", "search": "mod-nv01 módulo no verificado módulos singulares módulo central planta baja pendiente pasillo central pendiente de definición", "floor": "pb", "x": 28.0, "y": 69.5}, {"id": "loc_93_MOD-NV02", "code": "MOD-NV02", "name": "Módulo No Verificado", "section": "Módulos Singulares", "level": "Planta Baja", "category": "Módulo Central", "details": "Pasillo central pendiente de definición", "status": "Pendiente", "search": "mod-nv02 módulo no verificado módulos singulares módulo central planta baja pendiente pasillo central pendiente de definición", "floor": "pb", "x": 30.0, "y": 69.5}, {"id": "loc_94_MOD-NV03", "code": "MOD-NV03", "name": "Módulo No Verificado", "section": "Módulos Singulares", "level": "Planta Baja", "category": "Módulo Central", "details": "Pasillo central pendiente de definición", "status": "Pendiente", "search": "mod-nv03 módulo no verificado módulos singulares módulo central planta baja pendiente pasillo central pendiente de definición", "floor": "pb", "x": 36.5, "y": 69.5}, {"id": "loc_95_MOD-NV04", "code": "MOD-NV04", "name": "Módulo No Verificado", "section": "Módulos Singulares", "level": "Planta Baja", "category": "Módulo Central", "details": "Pasillo central pendiente de definición", "status": "Pendiente", "search": "mod-nv04 módulo no verificado módulos singulares módulo central planta baja pendiente pasillo central pendiente de definición", "floor": "pb", "x": 45.0, "y": 69.5}, {"id": "loc_96_MOD-APSA01", "code": "MOD-APSA01", "name": "APSA M. (Reserva Corporativa)", "section": "Módulos Singulares", "level": "Planta Baja", "category": "Módulo Central", "details": "Pasillo central reserva de gestión institucional", "status": "Reserva", "search": "mod-apsa01 apsa m. (reserva corporativa) módulos singulares módulo central planta baja reserva pasillo central reserva de gestión institucional", "floor": "pb", "x": 52.92, "y": 69.16}, {"id": "loc_97_MOD-APSA02", "code": "MOD-APSA02", "name": "APSA M. (Reserva Corporativa)", "section": "Módulos Singulares", "level": "Planta Baja", "category": "Módulo Central", "details": "Pasillo central reserva de gestión institucional", "status": "Reserva", "search": "mod-apsa02 apsa m. (reserva corporativa) módulos singulares módulo central planta baja reserva pasillo central reserva de gestión institucional", "floor": "pb", "x": 52.89, "y": 72.78}, {"id": "loc_98_SECTOR03", "code": "SECTOR 03", "name": "Macrosector Cines / Fray Lamas", "section": "Módulos Singulares", "level": "Planta Baja", "category": "Macrosector Comercial", "details": "Macrosector comercial / apoyo a Cines en ala norte hacia Fray Lamas.", "status": "Servicio", "search": "sector 03 macrosector cines / fray lamas módulos singulares macrosector comercial planta baja servicio macrosector comercial / apoyo a cines en ala norte hacia fray lamas.", "floor": "pb", "x": 60.07, "y": 31.14}, {"id": "loc_99_PBMALLBAODAMAS", "code": "PB MALL BAÑO DAMAS", "name": "Baño Damas", "section": "Núcleos Sanitarios (Baños) y Nomenclatura Exacta", "level": "Planta Baja", "category": "Sanitario / Servicios al Público", "details": "Batería sanitaria femenina detrás de N00L18 (Enzo) y N00L19 (XL).", "status": "Servicio", "search": "pb mall baño damas baño damas núcleos sanitarios (baños) y nomenclatura exacta sanitario / servicios al público planta baja servicio batería sanitaria femenina detrás de n00l18 (enzo) y n00l19 (xl).", "floor": "pb", "x": 31.8, "y": 62.68}, {"id": "loc_100_PBMALLBAOCABALLEROS", "code": "PB MALL BAÑO CABALLEROS", "name": "Baño Caballeros", "section": "Núcleos Sanitarios (Baños) y Nomenclatura Exacta", "level": "Planta Baja", "category": "Sanitario / Servicios al Público", "details": "Batería sanitaria masculina detrás de N00L18 (Enzo) y N00L19 (XL).", "status": "Servicio", "search": "pb mall baño caballeros baño caballeros núcleos sanitarios (baños) y nomenclatura exacta sanitario / servicios al público planta baja servicio batería sanitaria masculina detrás de n00l18 (enzo) y n00l19 (xl).", "floor": "pb", "x": 30.62, "y": 62.63}, {"id": "loc_101_PBMALLBAODISCAPACITADOS", "code": "PB MALL BAÑO DISCAPACITADOS", "name": "Baño Discapacitados", "section": "Núcleos Sanitarios (Baños) y Nomenclatura Exacta", "level": "Planta Baja", "category": "Sanitario / Servicios al Público", "details": "Cabina accesible detrás de N00L18 (Enzo).", "status": "Servicio", "search": "pb mall baño discapacitados baño discapacitados núcleos sanitarios (baños) y nomenclatura exacta sanitario / servicios al público planta baja servicio cabina accesible detrás de n00l18 (enzo).", "floor": "pb", "x": 31.88, "y": 64.17}, {"id": "loc_102_PBMALLBAONIOSCAMBIADOR", "code": "PB MALL BAÑO NIÑOS - CAMBIADOR", "name": "Baño Niños - Cambiador", "section": "Núcleos Sanitarios (Baños) y Nomenclatura Exacta", "level": "Planta Baja", "category": "Sanitario / Servicios al Público", "details": "Sanitario infantil y lactario/cambiador contiguo a Baño Discapacitados.", "status": "Servicio", "search": "pb mall baño niños - cambiador baño niños - cambiador núcleos sanitarios (baños) y nomenclatura exacta sanitario / servicios al público planta baja servicio sanitario infantil y lactario/cambiador contiguo a baño discapacitados.", "floor": "pb", "x": 30.83, "y": 64.94}, {"id": "loc_103_PBCINESBAOSDAMASCABALLEROS", "code": "PB CINES BAÑOS DAMAS / CABALLEROS", "name": "Baños Damas / Caballeros", "section": "Núcleos Sanitarios (Baños) y Nomenclatura Exacta", "level": "Planta Baja", "category": "Sanitario / Servicios al Público", "details": "Batería de baños dentro del área de Cines / Sector 03 (Norte).", "status": "Servicio", "search": "pb cines baños damas / caballeros baños damas / caballeros núcleos sanitarios (baños) y nomenclatura exacta sanitario / servicios al público planta baja servicio batería de baños dentro del área de cines / sector 03 (norte).", "floor": "pb", "x": 68.5, "y": 36.5}, {"id": "loc_104_N1BAOSPBLICOSMALL", "code": "N1 BAÑOS PÚBLICOS MALL", "name": "Baños Públicos Mall", "section": "Núcleos Sanitarios (Baños) y Nomenclatura Exacta", "level": "1er Nivel", "category": "Sanitario / Servicios al Público", "details": "Batería de sanitarios frente a ascensores del 1er nivel y Neverland.", "status": "Servicio", "search": "n1 baños públicos mall baños públicos mall núcleos sanitarios (baños) y nomenclatura exacta sanitario / servicios al público 1er nivel servicio batería de sanitarios frente a ascensores del 1er nivel y neverland.", "floor": "1n", "x": 38.5, "y": 28.5}, {"id": "loc_105_ACCPEATGUEMES", "code": "ACC-PEAT-GUEMES", "name": "Acceso Peatonal Principal", "section": "Accesos Peatonales y Rampas Vehiculares", "level": "Planta Baja / Exterior", "category": "Acceso / Circulación", "details": "Ubicación: Av. Luis Güemes | Hall Frío, atrio de entrada, escaleras mecánicas y fijas hacia mall central.", "status": "Servicio", "search": "acc-peat-guemes acceso peatonal principal accesos peatonales y rampas vehiculares acceso / circulación planta baja / exterior servicio ubicación: av. luis güemes | hall frío, atrio de entrada, escaleras mecánicas y fijas hacia mall central.", "floor": "pb", "x": 57.0, "y": 82.5}, {"id": "loc_106_ACCPEATDEFENSA", "code": "ACC-PEAT-DEFENSA", "name": "Acceso Peatonal / Escape", "section": "Accesos Peatonales y Rampas Vehiculares", "level": "Planta Baja / Exterior", "category": "Acceso / Circulación", "details": "Ubicación: Calles Defensa y Chamoun | Ingreso/egreso rotonda oeste (Miniso/Puma/Cristóbal Colón).", "status": "Servicio", "search": "acc-peat-defensa acceso peatonal / escape accesos peatonales y rampas vehiculares acceso / circulación planta baja / exterior servicio ubicación: calles defensa y chamoun | ingreso/egreso rotonda oeste (miniso/puma/cristóbal colón).", "floor": "pb", "x": 4.5, "y": 67.0}, {"id": "loc_107_ACCPEATBAYLE", "code": "ACC-PEAT-BAYLE", "name": "Acceso Peatonal / Escape", "section": "Accesos Peatonales y Rampas Vehiculares", "level": "Planta Baja / Exterior", "category": "Acceso / Circulación", "details": "Ubicación: Calle Bayle | Salida este del complejo desde Food Court y Momo Store.", "status": "Servicio", "search": "acc-peat-bayle acceso peatonal / escape accesos peatonales y rampas vehiculares acceso / circulación planta baja / exterior servicio ubicación: calle bayle | salida este del complejo desde food court y momo store.", "floor": "pb", "x": 96.5, "y": 45.5}, {"id": "loc_108_ACCLOGCONGRESO", "code": "ACC-LOG-CONGRESO", "name": "Acceso Logístico / Proveedores", "section": "Accesos Peatonales y Rampas Vehiculares", "level": "Planta Baja / Exterior", "category": "Acceso / Circulación", "details": "Ubicación: Calle Congreso | Entrada exclusiva de camiones, carga/descarga y servicio.", "status": "Servicio", "search": "acc-log-congreso acceso logístico / proveedores accesos peatonales y rampas vehiculares acceso / circulación planta baja / exterior servicio ubicación: calle congreso | entrada exclusiva de camiones, carga/descarga y servicio.", "floor": "pb", "x": 42.16, "y": 29.51}, {"id": "loc_109_RAMPAVEHNORTE", "code": "RAMPA-VEH-NORTE", "name": "Rampa Vehicular", "section": "Accesos Peatonales y Rampas Vehiculares", "level": "Planta Baja / Exterior", "category": "Acceso / Circulación", "details": "Ubicación: Calle Congreso / Fray Lamas | Rampa helicoidal curva de acceso y egreso hacia 1SS y 2SS.", "status": "Servicio", "search": "rampa-veh-norte rampa vehicular accesos peatonales y rampas vehiculares acceso / circulación planta baja / exterior servicio ubicación: calle congreso / fray lamas | rampa helicoidal curva de acceso y egreso hacia 1ss y 2ss.", "floor": "pb", "x": 39.5, "y": 27.5}, {"id": "loc_110_RAMPAVEHSUR", "code": "RAMPA-VEH-SUR", "name": "Rampa Vehicular", "section": "Accesos Peatonales y Rampas Vehiculares", "level": "Planta Baja / Exterior", "category": "Acceso / Circulación", "details": "Ubicación: Av. Luis Güemes | Rampa vehicular directa hacia cocheras subterráneas.", "status": "Servicio", "search": "rampa-veh-sur rampa vehicular accesos peatonales y rampas vehiculares acceso / circulación planta baja / exterior servicio ubicación: av. luis güemes | rampa vehicular directa hacia cocheras subterráneas.", "floor": "pb", "x": 4.8, "y": 75.5}, {"id": "loc_111_OFICINASGALERIASCOMERCIALES", "code": "OFICINAS GALERIAS COMERCIALES", "name": "Oficinas Galerias Comerciales", "section": "Oficinas de Administración y Seguridad", "level": "Entrepiso (+10.30)", "category": "Oficinas de Administración del Shopping / IRSA.", "details": "`1ER NIVEL.pdf`  Oficinas de Administración del Shopping / IRSA.", "status": "Servicio", "search": "oficinas galerias comerciales oficinas galerias comerciales oficinas de administración y seguridad oficinas de administración del shopping / irsa. entrepiso (+10.30) servicio `1er nivel.pdf`  oficinas de administración del shopping / irsa.", "floor": "1n", "x": 60.0, "y": 18.0}, {"id": "loc_112_HALLACCESOOFICINAS", "code": "HALL ACCESO OFICINAS", "name": "Hall Acceso Oficinas", "section": "Oficinas de Administración y Seguridad", "level": "Entrepiso (+10.30)", "category": "Recepción y control de acceso administrativo.", "details": "`1ER NIVEL.pdf`  Recepción y control de acceso administrativo.", "status": "Servicio", "search": "hall acceso oficinas hall acceso oficinas oficinas de administración y seguridad recepción y control de acceso administrativo. entrepiso (+10.30) servicio `1er nivel.pdf`  recepción y control de acceso administrativo.", "floor": "1n", "x": 53.0, "y": 22.0}, {"id": "loc_113_SALAREUNIONYGERENTE", "code": "SALA REUNION Y GERENTE", "name": "Sala Reunion Y Gerente", "section": "Oficinas de Administración y Seguridad", "level": "Entrepiso (+10.30)", "category": "Despacho gerencial y sala de conferencias.", "details": "`1ER NIVEL.pdf`  Despacho gerencial y sala de conferencias.", "status": "Servicio", "search": "sala reunion y gerente sala reunion y gerente oficinas de administración y seguridad despacho gerencial y sala de conferencias. entrepiso (+10.30) servicio `1er nivel.pdf`  despacho gerencial y sala de conferencias.", "floor": "1n", "x": 62.0, "y": 19.0}, {"id": "loc_114_POOLDEJEFES", "code": "POOL DE JEFES", "name": "Pool De Jefes", "section": "Oficinas de Administración y Seguridad", "level": "Entrepiso (+10.30)", "category": "Puestos de trabajo de supervisión y gestión.", "details": "`1ER NIVEL.pdf`  Puestos de trabajo de supervisión y gestión.", "status": "Servicio", "search": "pool de jefes pool de jefes oficinas de administración y seguridad puestos de trabajo de supervisión y gestión. entrepiso (+10.30) servicio `1er nivel.pdf`  puestos de trabajo de supervisión y gestión.", "floor": "1n", "x": 65.0, "y": 20.0}, {"id": "loc_115_OFICINASSUPERMERCADO", "code": "OFICINAS SUPERMERCADO", "name": "Oficinas Supermercado", "section": "Oficinas de Administración y Seguridad", "level": "Entrepiso (+10.30)", "category": "Área administrativa de Carrefour.", "details": "`1ER NIVEL.pdf`  Área administrativa de Carrefour.", "status": "Servicio", "search": "oficinas supermercado oficinas supermercado oficinas de administración y seguridad área administrativa de carrefour. entrepiso (+10.30) servicio `1er nivel.pdf`  área administrativa de carrefour.", "floor": "1n", "x": 70.0, "y": 20.0}, {"id": "loc_116_OFSEGURIDAD", "code": "OF. SEGURIDAD", "name": "Of. Seguridad", "section": "Oficinas de Administración y Seguridad", "level": "Planta Baja", "category": "Puesto de seguridad y control de personal externo.", "details": "Dársena Carga y Descarga  Puesto de seguridad y control de personal externo.", "status": "Servicio", "search": "of. seguridad of. seguridad oficinas de administración y seguridad puesto de seguridad y control de personal externo. planta baja servicio dársena carga y descarga  puesto de seguridad y control de personal externo.", "floor": "pb", "x": 36.0, "y": 52.0}, {"id": "loc_117_OFRECEPCION", "code": "OF. RECEPCION", "name": "Of. Recepcion", "section": "Oficinas de Administración y Seguridad", "level": "Planta Baja", "category": "Mesa de entradas, remitos y control logístico.", "details": "Dársena Carga y Descarga  Mesa de entradas, remitos y control logístico.", "status": "Servicio", "search": "of. recepcion of. recepcion oficinas de administración y seguridad mesa de entradas, remitos y control logístico. planta baja servicio dársena carga y descarga  mesa de entradas, remitos y control logístico.", "floor": "pb", "x": 37.0, "y": 50.0}, {"id": "loc_118_CONTRALORCARREFOUR", "code": "CONTRALOR CARREFOUR", "name": "Contralor Carrefour", "section": "Oficinas de Administración y Seguridad", "level": "Planta Baja", "category": "Puesto de contralor de mercadería de hipermercado.", "details": "Dársena Carga y Descarga  Puesto de contralor de mercadería de hipermercado.", "status": "Servicio", "search": "contralor carrefour contralor carrefour oficinas de administración y seguridad puesto de contralor de mercadería de hipermercado. planta baja servicio dársena carga y descarga  puesto de contralor de mercadería de hipermercado.", "floor": "pb", "x": 38.0, "y": 48.0}, {"id": "loc_119_CCTVSHOPPING", "code": "CCTV SHOPPING", "name": "Cctv Shopping", "section": "Oficinas de Administración y Seguridad", "level": "Planta Baja", "category": "Centro de control de cámaras de seguridad del complejo.", "details": "Dársena Carga y Descarga  Centro de control de cámaras de seguridad del complejo.", "status": "Servicio", "search": "cctv shopping cctv shopping oficinas de administración y seguridad centro de control de cámaras de seguridad del complejo. planta baja servicio dársena carga y descarga  centro de control de cámaras de seguridad del complejo.", "floor": "pb", "x": 36.5, "y": 53.5}, {"id": "loc_120_CARGAYDESCARGA", "code": "CARGA Y DESCARGA", "name": "Carga Y Descarga", "section": "Logística, Servicios y Maquinaria", "level": "Planta Baja", "category": "Logística & Servicios Técnicos", "details": "Calle Congreso  Dársena techada para camiones y aprovisionamiento.", "status": "Servicio", "search": "carga y descarga carga y descarga logística, servicios y maquinaria logística & servicios técnicos planta baja servicio calle congreso  dársena techada para camiones y aprovisionamiento.", "floor": "pb", "x": 37.5, "y": 52.0}, {"id": "loc_121_PRENSACARTONCompactadora", "code": "PRENSA CARTON (Compactadora)", "name": "Prensa Carton (Compactadora)", "section": "Logística, Servicios y Maquinaria", "level": "Planta Baja", "category": "Logística & Servicios Técnicos", "details": "Anexo a Carga y Descarga  Sector de compactadora de residuos y prensa de cartón.", "status": "Servicio", "search": "prensa carton (compactadora) prensa carton (compactadora) logística, servicios y maquinaria logística & servicios técnicos planta baja servicio anexo a carga y descarga  sector de compactadora de residuos y prensa de cartón.", "floor": "pb", "x": 39.0, "y": 50.0}, {"id": "loc_122_SALADEGAS", "code": "SALA DE GAS", "name": "Sala De Gas", "section": "Logística, Servicios y Maquinaria", "level": "Planta Baja", "category": "Logística & Servicios Técnicos", "details": "Calle Congreso  Regulación y medición de gas natural de media/baja presión.", "status": "Servicio", "search": "sala de gas sala de gas logística, servicios y maquinaria logística & servicios técnicos planta baja servicio calle congreso  regulación y medición de gas natural de media/baja presión.", "floor": "pb", "x": 42.5, "y": 33.0}, {"id": "loc_123_CENTRALBAJAMEDIATEMP", "code": "CENTRAL BAJA / MEDIA TEMP.", "name": "Central Baja / Media Temp.", "section": "Logística, Servicios y Maquinaria", "level": "Planta Baja", "category": "Logística & Servicios Técnicos", "details": "Patio de Comidas  Central frigorífica para cámaras de locales gastronómicos.", "status": "Servicio", "search": "central baja / media temp. central baja / media temp. logística, servicios y maquinaria logística & servicios técnicos planta baja servicio patio de comidas  central frigorífica para cámaras de locales gastronómicos.", "floor": "pb", "x": 75.0, "y": 45.0}, {"id": "loc_124_S23GRUPOELECTROGENO", "code": "S23 GRUPO ELECTROGENO", "name": "S23 Grupo Electrogeno", "section": "Logística, Servicios y Maquinaria", "level": "2° Subsuelo (2SS)", "category": "Logística & Servicios Técnicos", "details": "Área Técnica 2SS  Grupo electrógeno de emergencia para respaldo eléctrico.", "status": "Servicio", "search": "s23 grupo electrogeno s23 grupo electrogeno logística, servicios y maquinaria logística & servicios técnicos 2° subsuelo (2ss) servicio área técnica 2ss  grupo electrógeno de emergencia para respaldo eléctrico.", "floor": "2ss", "x": 40.0, "y": 35.0}, {"id": "loc_125_S25S26SALASDEMAQUINAS", "code": "S25 / S26 SALAS DE MAQUINAS", "name": "S25 / S26 Salas De Maquinas", "section": "Logística, Servicios y Maquinaria", "level": "2° Subsuelo (2SS)", "category": "Logística & Servicios Técnicos", "details": "Área Técnica 2SS  Equipamiento de bombeo, termo-mecánica y tableros.", "status": "Servicio", "search": "s25 / s26 salas de maquinas s25 / s26 salas de maquinas logística, servicios y maquinaria logística & servicios técnicos 2° subsuelo (2ss) servicio área técnica 2ss  equipamiento de bombeo, termo-mecánica y tableros.", "floor": "2ss", "x": 45.0, "y": 35.0}, {"id": "loc_126_S24PLENOSDEVENTILACION", "code": "S24 PLENOS DE VENTILACION", "name": "S24 Plenos De Ventilacion", "section": "Logística, Servicios y Maquinaria", "level": "Subsuelos", "category": "Logística & Servicios Técnicos", "details": "1SS y 2SS  Plenos de ventilación forzada y extracción de humos.", "status": "Servicio", "search": "s24 plenos de ventilacion s24 plenos de ventilacion logística, servicios y maquinaria logística & servicios técnicos subsuelos servicio 1ss y 2ss  plenos de ventilación forzada y extracción de humos.", "floor": "1ss", "x": 52.0, "y": 35.0}, {"id": "loc_127_ASCPBPUB01", "code": "ASC-PB-PUB01", "name": "Ascensor público para clientes.", "section": "Sector de Ascensores y Montacargas", "level": "2SS - 1SS - PB", "category": "Transporte Vertical", "details": "Ubicación: PB Central (frente a Selú N00L17) | Conexión: 2SS - 1SS - PB", "status": "Servicio", "search": "asc-pb-pub01 ascensor público para clientes. sector de ascensores y montacargas transporte vertical 2ss - 1ss - pb servicio ubicación: pb central (frente a selú n00l17) | conexión: 2ss - 1ss - pb", "floor": "pb", "x": 25.1, "y": 62.5}, {"id": "loc_128_ASCPBPUB02", "code": "ASC-PB-PUB02", "name": "Ascensor público para clientes.", "section": "Sector de Ascensores y Montacargas", "level": "2SS - 1SS - PB", "category": "Transporte Vertical", "details": "Ubicación: PB Central (frente a Selú N00L17) | Conexión: 2SS - 1SS - PB", "status": "Servicio", "search": "asc-pb-pub02 ascensor público para clientes. sector de ascensores y montacargas transporte vertical 2ss - 1ss - pb servicio ubicación: pb central (frente a selú n00l17) | conexión: 2ss - 1ss - pb", "floor": "pb", "x": 25.6, "y": 62.5}, {"id": "loc_129_ASCN1PUB01", "code": "ASC-N1-PUB01", "name": "Ascensor público clientes entretenimiento/gimnasio.", "section": "Sector de Ascensores y Montacargas", "level": "PB - 1er Nivel", "category": "Transporte Vertical", "details": "Ubicación: 1er Nivel (frente a SmartFit/Neverland) | Conexión: PB - 1er Nivel", "status": "Servicio", "search": "asc-n1-pub01 ascensor público clientes entretenimiento/gimnasio. sector de ascensores y montacargas transporte vertical pb - 1er nivel servicio ubicación: 1er nivel (frente a smartfit/neverland) | conexión: pb - 1er nivel", "floor": "1n", "x": 39.0, "y": 30.0}, {"id": "loc_130_ASCN1PUB02", "code": "ASC-N1-PUB02", "name": "Ascensor público clientes entretenimiento/gimnasio.", "section": "Sector de Ascensores y Montacargas", "level": "PB - 1er Nivel", "category": "Transporte Vertical", "details": "Ubicación: 1er Nivel (frente a SmartFit/Neverland) | Conexión: PB - 1er Nivel", "status": "Servicio", "search": "asc-n1-pub02 ascensor público clientes entretenimiento/gimnasio. sector de ascensores y montacargas transporte vertical pb - 1er nivel servicio ubicación: 1er nivel (frente a smartfit/neverland) | conexión: pb - 1er nivel", "floor": "1n", "x": 40.0, "y": 30.0}, {"id": "loc_131_ASCCINES01", "code": "ASC-CINES-01", "name": "Ascensor de público para Showcase Cinemas.", "section": "Sector de Ascensores y Montacargas", "level": "PB - Salas Cines", "category": "Transporte Vertical", "details": "Ubicación: PB Norte / Sector 03 | Conexión: PB - Salas Cines", "status": "Servicio", "search": "asc-cines-01 ascensor de público para showcase cinemas. sector de ascensores y montacargas transporte vertical pb - salas cines servicio ubicación: pb norte / sector 03 | conexión: pb - salas cines", "floor": "pb", "x": 68.2, "y": 38.0}, {"id": "loc_132_MONTSERVCARGA", "code": "MONT-SERV-CARGA", "name": "Montacargas de servicio para abastecimiento comercial.", "section": "Sector de Ascensores y Montacargas", "level": "Subsuelos - PB", "category": "Transporte Vertical", "details": "Ubicación: PB Dársena Carga y Descarga | Conexión: Subsuelos - PB", "status": "Servicio", "search": "mont-serv-carga montacargas de servicio para abastecimiento comercial. sector de ascensores y montacargas transporte vertical subsuelos - pb servicio ubicación: pb dársena carga y descarga | conexión: subsuelos - pb", "floor": "pb", "x": 36.8, "y": 54.0}, {"id": "loc_133_MONTLOCALBAIL", "code": "MONT-LOCAL-BAIL", "name": "Montacargas independiente para abastecimiento.", "section": "Sector de Ascensores y Montacargas", "level": "PB - Entrepiso", "category": "Transporte Vertical", "details": "Ubicación: PB Dársena Carga y Descarga | Conexión: PB - Entrepiso", "status": "Servicio", "search": "mont-local-bail montacargas independiente para abastecimiento. sector de ascensores y montacargas transporte vertical pb - entrepiso servicio ubicación: pb dársena carga y descarga | conexión: pb - entrepiso", "floor": "pb", "x": 38.2, "y": 54.0}, {"id": "loc_134_ASCSS01ASCSS02", "code": "ASC-SS-01 / ASC-SS-02", "name": "Ascensores de vinculación directa entre cocheras.", "section": "Sector de Ascensores y Montacargas", "level": "2SS - 1SS", "category": "Transporte Vertical", "details": "Ubicación: Subsuelos (S27 / S28) | Conexión: 2SS - 1SS", "status": "Servicio", "search": "asc-ss-01 / asc-ss-02 ascensores de vinculación directa entre cocheras. sector de ascensores y montacargas transporte vertical 2ss - 1ss servicio ubicación: subsuelos (s27 / s28) | conexión: 2ss - 1ss", "floor": "1ss", "x": 35.0, "y": 65.0}, {"id": "loc_135_PAS-TEC-SUR", "code": "PAS-TEC-SUR", "name": "Pasillo Técnico Perimetral Sur", "section": "Pasillos Técnicos", "level": "Planta Baja / Perimetral", "category": "Pasillo Técnico", "details": "Ubicado detrás de los locales La Perfumerie (`N00L01`), Soho (`N00L02`), Boardriders (`N00L03`), Macowens (`N00L04`) y Prüne (`N00L05`).", "status": "Servicio", "search": "pas-tec-sur pasillo técnico perimetral sur pasillos técnicos pasillo técnico planta baja / perimetral servicio ubicado detrás de los locales la perfumerie (`n00l01`), soho (`n00l02`), boardriders (`n00l03`), macowens (`n00l04`) y prüne (`n00l05`).", "floor": "pb", "x": 42.0, "y": 82.5}, {"id": "loc_136_PAS-TEC-GASTRON", "code": "PAS-TEC-GASTRON", "name": "Pasillo Técnico de Gastronomía", "section": "Pasillos Técnicos", "level": "Planta Baja / Perimetral", "category": "Pasillo Técnico", "details": "Pasillo exclusivo de servicio trasero detrás de KFC (`N00L046`), Punto Verona (`N00L044`), Al Amir (`N00L045`), Betos (`N00L050`), BK (`N00L049`) y Mostaza (`N00L052`).", "status": "Servicio", "search": "pas-tec-gastron pasillo técnico de gastronomía pasillos técnicos pasillo técnico planta baja / perimetral servicio pasillo exclusivo de servicio trasero detrás de kfc (`n00l046`), punto verona (`n00l044`), al amir (`n00l045`), betos (`n00l050`), bk (`n00l049`) y mostaza (`n00l052`).", "floor": "pb", "x": 75.0, "y": 37.5}, {"id": "loc_137_PAS-TEC-CARGA", "code": "PAS-TEC-CARGA", "name": "Pasillo Técnico de Bauleras y Carga", "section": "Pasillos Técnicos", "level": "Planta Baja / Perimetral", "category": "Pasillo Técnico", "details": "Corredor que vincula la dársena de calle Congreso con las 12 bauleras (`N00BA001` a `N00BA012`) y el montacargas.", "status": "Servicio", "search": "pas-tec-carga pasillo técnico de bauleras y carga pasillos técnicos pasillo técnico planta baja / perimetral servicio corredor que vincula la dársena de calle congreso con las 12 bauleras (`n00ba001` a `n00ba012`) y el montacargas.", "floor": "pb", "x": 46.0, "y": 46.0}, {"id": "loc_138_PAS-TEC-ESTE", "code": "PAS-TEC-ESTE", "name": "Pasillo de Escape y Servicio Este", "section": "Pasillos Técnicos", "level": "Planta Baja / Perimetral", "category": "Pasillo Técnico", "details": "Corredor perimetral con salida a calle Bayle y paso bajo pasarela técnica.", "status": "Servicio", "search": "pas-tec-este pasillo de escape y servicio este pasillos técnicos pasillo técnico planta baja / perimetral servicio corredor perimetral con salida a calle bayle y paso bajo pasarela técnica.", "floor": "pb", "x": 92.5, "y": 65.0}];
+
+    // FLOOR IMAGES CONFIG
+    const FLOOR_MAPS = {
+      'pb': {
+        img: 'planta_baja_150dpi.png',
+        name: 'Planta Baja',
+        width: 2482,
+        height: 1755,
+        defaultZoom: 1.0
+      },
+      '1n': {
+        img: 'planta_1er_nivel_150dpi.png',
+        name: '1er Nivel y Entrepiso',
+        width: 1755,
+        height: 2482,
+        defaultZoom: 1.0
+      },
+      '1ss': {
+        img: 'planta_1ss_150dpi.png',
+        name: '1° Subsuelo',
+        width: 2482,
+        height: 1755,
+        defaultZoom: 1.0
+      },
+      '2ss': {
+        img: 'planta_2ss_150dpi.png',
+        name: '2° Subsuelo',
+        width: 2482,
+        height: 1755,
+        defaultZoom: 1.0
+      }
+    };
+
+    // STATE
+    const state = {
+      viewMode: 'map', // 'map', 'grid', 'table'
+      currentFloor: 'pb',
+      searchQuery: '',
+      selectedCategory: 'all',
+      selectedIds: new Set(),
+      activeSpotlightId: null,
+      showLabels: true,
+      showPins: true,
+      outputFormat: 'names-comma',
+      // Pan & Zoom Engine State
+      panX: 0,
+      panY: 0,
+      scale: 1.0,
+      isDragging: false,
+      startX: 0,
+      startY: 0
+    };
+
+    // DOM Elements
+    const mapStage = document.getElementById('map-stage');
+    const mapViewport = document.getElementById('map-viewport');
+    const blueprintImg = document.getElementById('blueprint-img');
+    const pinsLayer = document.getElementById('pins-layer');
+    const sidebarSearch = document.getElementById('sidebar-search');
+    const sidebarSearchClear = document.getElementById('sidebar-search-clear');
+    const sidebarList = document.getElementById('sidebar-locations-list');
+    const cardsGrid = document.getElementById('cards-grid');
+    const tableBody = document.getElementById('table-body');
+    const inspector = document.getElementById('location-inspector');
+    const selectionTray = document.getElementById('selection-tray');
+    const trayCountNum = document.getElementById('tray-count-num');
+    const headerSelCount = document.getElementById('header-sel-count');
+    const toast = document.getElementById('toast');
+    const toastMsg = document.getElementById('toast-msg');
+
+    // Pan & Zoom Implementation
+    function updateTransform(smooth = false) {
+      if (smooth) {
+        mapViewport.style.transition = 'transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)';
+      } else {
+        mapViewport.style.transition = 'none';
+      }
+      mapViewport.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.scale})`;
+    }
+
+    function fitToStage() {
+      const cfg = FLOOR_MAPS[state.currentFloor];
+      const stageW = mapStage.clientWidth;
+      const stageH = mapStage.clientHeight;
+      if (!stageW || !stageH) return;
+
+      const scaleX = (stageW - 40) / cfg.width;
+      const scaleY = (stageH - 40) / cfg.height;
+      state.scale = Math.min(scaleX, scaleY, 1.2);
+      state.panX = (stageW - cfg.width * state.scale) / 2;
+      state.panY = (stageH - cfg.height * state.scale) / 2;
+      updateTransform(true);
+    }
+
+    function resetZoom() {
+      state.scale = 1.0;
+      const stageW = mapStage.clientWidth;
+      const stageH = mapStage.clientHeight;
+      const cfg = FLOOR_MAPS[state.currentFloor];
+      state.panX = (stageW - cfg.width) / 2;
+      state.panY = (stageH - cfg.height) / 2;
+      updateTransform(true);
+    }
+
+    function zoomAt(targetScale, clientX, clientY, smooth = false) {
+      const minScale = 0.25;
+      const maxScale = 4.5;
+      targetScale = Math.min(Math.max(targetScale, minScale), maxScale);
+
+      const rect = mapStage.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+
+      // Adjust pan so the point under cursor remains stationary
+      const currentScale = state.scale;
+      state.panX = x - (x - state.panX) * (targetScale / currentScale);
+      state.panY = y - (y - state.panY) * (targetScale / currentScale);
+      state.scale = targetScale;
+      updateTransform(smooth);
+    }
+
+    // Zoom & Pan Mouse Listeners
+    mapStage.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+      zoomAt(state.scale * zoomFactor, e.clientX, e.clientY, false);
+    }, { passive: false });
+
+    mapStage.addEventListener('mousedown', (e) => {
+      // Don't drag if clicking inspector or controls
+      if (e.target.closest('#location-inspector') || e.target.closest('.map-controls') || e.target.closest('.sector-jumper')) return;
+      state.isDragging = true;
+      state.startX = e.clientX - state.panX;
+      state.startY = e.clientY - state.panY;
+      mapStage.style.cursor = 'grabbing';
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!state.isDragging) return;
+      state.panX = e.clientX - state.startX;
+      state.panY = e.clientY - state.startY;
+      updateTransform(false);
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (state.isDragging) {
+        state.isDragging = false;
+        mapStage.style.cursor = 'grab';
+      }
+    });
+
+    // Touch Support for Mobile / Tablets
+    let initialTouchDist = null;
+    let initialScale = 1.0;
+
+    mapStage.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        state.isDragging = true;
+        state.startX = e.touches[0].clientX - state.panX;
+        state.startY = e.touches[0].clientY - state.panY;
+      } else if (e.touches.length === 2) {
+        state.isDragging = false;
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        initialTouchDist = Math.hypot(dx, dy);
+        initialScale = state.scale;
+      }
+    }, { passive: true });
+
+    mapStage.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 1 && state.isDragging) {
+        state.panX = e.touches[0].clientX - state.startX;
+        state.panY = e.touches[0].clientY - state.startY;
+        updateTransform(false);
+      } else if (e.touches.length === 2 && initialTouchDist) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.hypot(dx, dy);
+        const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        const targetScale = initialScale * (dist / initialTouchDist);
+        zoomAt(targetScale, midX, midY, false);
+      }
+    }, { passive: true });
+
+    mapStage.addEventListener('touchend', () => {
+      state.isDragging = false;
+      initialTouchDist = null;
+    });
+
+    // Floor Switcher
+    function switchFloor(floorKey) {
+      if (!FLOOR_MAPS[floorKey]) return;
+      state.currentFloor = floorKey;
+
+      // Update Floor Buttons
+      document.querySelectorAll('.floor-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.floor === floorKey);
+      });
+
+      // Update blueprint image
+      const cfg = FLOOR_MAPS[floorKey];
+      blueprintImg.src = cfg.img;
+      blueprintImg.width = cfg.width;
+      blueprintImg.height = cfg.height;
+
+      // Toggle sector jumper visibility (only in PB)
+      document.getElementById('sector-jumper').style.display = (floorKey === 'pb') ? 'flex' : 'none';
+
+      // Re-render pins & list
+      renderPins();
+      renderSidebarList();
+      fitToStage();
+    }
+
+    // Zoom into specific coordinate on map
+    function focusLocationOnMap(loc, zoomLevel = 2.0) {
+      // 1. Switch floor if needed
+      if (loc.floor && loc.floor !== state.currentFloor) {
+        switchFloor(loc.floor);
+      }
+
+      // 2. Switch to Map view if on another tab
+      if (state.viewMode !== 'map') {
+        switchViewMode('map');
+      }
+
+      // 3. Highlight pin
+      state.activeSpotlightId = loc.id;
+      renderPins();
+      renderSidebarList();
+
+      // 4. Center map smoothly on coordinate
+      const cfg = FLOOR_MAPS[state.currentFloor];
+      const stageW = mapStage.clientWidth;
+      const stageH = mapStage.clientHeight;
+
+      const targetX = (loc.x / 100) * cfg.width;
+      const targetY = (loc.y / 100) * cfg.height;
+
+      state.scale = zoomLevel;
+      state.panX = stageW / 2 - targetX * state.scale;
+      state.panY = stageH / 2 - targetY * state.scale;
+      updateTransform(true);
+
+      // 5. Open Inspector Card
+      openInspector(loc);
+    }
+
+    // Category styling helper
+    function getCategoryClass(loc) {
+      const cat = (loc.category || '').toLowerCase();
+      const sec = (loc.section || '').toLowerCase();
+      const status = (loc.status || '').toLowerCase();
+
+      if (status === 'vacante') return 'pin-cat-vacant';
+      if (cat.includes('gastronomía') || cat.includes('fast food') || cat.includes('helado')) return 'pin-cat-gastro';
+      if (sec.includes('góndolas') || sec.includes('stand')) return 'pin-cat-stand';
+      if (cat.includes('cines') || cat.includes('entretenimiento') || cat.includes('fitness') || cat.includes('gimnasio')) return 'pin-cat-entert';
+      if (sec.includes('sanitarios') || sec.includes('baño') || sec.includes('accesos')) return 'pin-cat-service';
+      if (sec.includes('bauleras') || sec.includes('logística') || sec.includes('pasillos')) return 'pin-cat-tech';
+      return 'pin-cat-retail';
+    }
+
+    function getCategoryIcon(loc) {
+      const cls = getCategoryClass(loc);
+      if (cls === 'pin-cat-vacant') return '🟡';
+      if (cls === 'pin-cat-gastro') return '🍔';
+      if (cls === 'pin-cat-stand') return '💎';
+      if (cls === 'pin-cat-entert') return '🎬';
+      if (cls === 'pin-cat-service') return '🚻';
+      if (cls === 'pin-cat-tech') return '📦';
+      return '🛍️';
+    }
+
+    // Render pins onto Blueprint Canvas
+    function renderPins() {
+      pinsLayer.innerHTML = '';
+      if (!state.showPins) return;
+
+      const floorLocs = LOCATIONS.filter(l => l.floor === state.currentFloor);
+
+      floorLocs.forEach(loc => {
+        const pin = document.createElement('div');
+        const catClass = getCategoryClass(loc);
+        const isSpotlight = state.activeSpotlightId === loc.id;
+        const isSelected = state.selectedIds.has(loc.id);
+
+        pin.className = `plan-pin ${catClass} ${isSpotlight ? 'is-spotlight' : ''} ${isSelected ? 'is-selected' : ''}`;
+        pin.style.left = `${loc.x}%`;
+        pin.style.top = `${loc.y}%`;
+        pin.id = `pin-${loc.id}`;
+
+        let beaconHtml = isSpotlight ? '<div class="spotlight-beacon"></div>' : '';
+        let labelText = loc.name === 'Vacante' ? loc.code : loc.name;
+
+        pin.innerHTML = `
+          ${beaconHtml}
+          <div class="pin-circle">${isSelected ? '✓' : getCategoryIcon(loc)}</div>
+          <div class="pin-label">${labelText}</div>
+        `;
+
+        pin.addEventListener('click', (e) => {
+          e.stopPropagation();
+          focusLocationOnMap(loc, Math.max(state.scale, 1.8));
+        });
+
+        pinsLayer.appendChild(pin);
+      });
+    }
+
+    // Location Inspector Card
+    function openInspector(loc) {
+      document.getElementById('insp-name').textContent = loc.name;
+      document.getElementById('insp-code').textContent = loc.code;
+      document.getElementById('insp-level').textContent = loc.level;
+      document.getElementById('insp-category').textContent = loc.category;
+      document.getElementById('insp-status').textContent = loc.status;
+      document.getElementById('insp-details').textContent = loc.details || loc.section;
+
+      const isSel = state.selectedIds.has(loc.id);
+      const selBtn = document.getElementById('insp-toggle-select');
+      selBtn.innerHTML = isSel ? '<span>✕</span> Deseleccionar' : '<span>✓</span> Seleccionar';
+
+      selBtn.onclick = () => {
+        toggleSelect(loc.id);
+        openInspector(loc);
+      };
+
+      document.getElementById('insp-copy').onclick = () => {
+        const text = `Ubicación: ${loc.code}
+Nombre: ${loc.name}
+Nivel: ${loc.level}
+Categoría: ${loc.category}
+Detalles: ${loc.details}
+Estado: ${loc.status}`;
+        copyText(text, `Ficha de ${loc.name} copiada`);
+      };
+
+      inspector.classList.add('active');
+    }
+
+    document.getElementById('insp-close').addEventListener('click', () => {
+      inspector.classList.remove('active');
+      state.activeSpotlightId = null;
+      renderPins();
+      renderSidebarList();
+    });
+
+    // Filter locations for list
+    function getFilteredLocations() {
+      const q = state.searchQuery.toLowerCase().trim();
+      return LOCATIONS.filter(l => {
+        // Floor filter (if querying in sidebar, show matching floor or all if searching)
+        if (state.viewMode === 'map' && !q && l.floor !== state.currentFloor) {
+          return false;
+        }
+
+        // Category filter
+        if (state.selectedCategory !== 'all') {
+          const cat = (l.category || '').toLowerCase();
+          const sec = (l.section || '').toLowerCase();
+          const stat = (l.status || '').toLowerCase();
+
+          if (state.selectedCategory === 'locales' && !sec.includes('locales')) return false;
+          if (state.selectedCategory === 'gastro' && !cat.includes('gastronomía') && !cat.includes('food')) return false;
+          if (state.selectedCategory === 'stands' && !sec.includes('góndolas')) return false;
+          if (state.selectedCategory === 'vacante' && stat !== 'vacante') return false;
+          if (state.selectedCategory === 'servicios' && !sec.includes('baño') && !sec.includes('accesos')) return false;
+        }
+
+        // Search text
+        if (q) {
+          return (l.search || '').includes(q) || (l.name || '').toLowerCase().includes(q) || (l.code || '').toLowerCase().includes(q);
+        }
+
+        return true;
+      });
+    }
+
+    // Render Sidebar List
+    function renderSidebarList() {
+      const filtered = getFilteredLocations();
+      sidebarList.innerHTML = '';
+
+      if (filtered.length === 0) {
+        sidebarList.innerHTML = `
+          <div style="text-align:center; padding:2rem 1rem; color:var(--text-dim); font-size:0.85rem;">
+            No se encontraron ubicaciones con el criterio actual.
+          </div>
+        `;
+        return;
+      }
+
+      filtered.forEach(loc => {
+        const isSelected = state.selectedIds.has(loc.id);
+        const isSpotlight = state.activeSpotlightId === loc.id;
+        const item = document.createElement('div');
+        item.className = `loc-item ${isSelected ? 'selected' : ''} ${isSpotlight ? 'active-spotlight' : ''}`;
+
+        const catClass = getCategoryClass(loc);
+
+        item.innerHTML = `
+          <div class="loc-badge ${catClass}">
+            ${getCategoryIcon(loc)}
+          </div>
+          <div class="loc-info">
+            <div class="loc-title">
+              <span>${loc.name}</span>
+            </div>
+            <div class="loc-sub">
+              <span class="loc-code">${loc.code}</span> • ${loc.category || loc.level}
+            </div>
+          </div>
+          <div class="loc-actions">
+            <button class="btn-icon btn-locate" title="Ver en Plano">🎯</button>
+            <input type="checkbox" class="custom-check" ${isSelected ? 'checked' : ''}>
+          </div>
+        `;
+
+        // Click item -> focus on map
+        item.addEventListener('click', (e) => {
+          if (e.target.type === 'checkbox') return;
+          focusLocationOnMap(loc, 2.0);
+        });
+
+        // Locate button
+        item.querySelector('.btn-locate').addEventListener('click', (e) => {
+          e.stopPropagation();
+          focusLocationOnMap(loc, 2.2);
+        });
+
+        // Checkbox
+        item.querySelector('input[type="checkbox"]').addEventListener('change', (e) => {
+          e.stopPropagation();
+          toggleSelect(loc.id);
+        });
+
+        sidebarList.appendChild(item);
+      });
+    }
+
+    // Render Cards Grid (Catalog View)
+    function renderCardsGrid() {
+      const filtered = getFilteredLocations();
+      cardsGrid.innerHTML = '';
+
+      filtered.forEach(loc => {
+        const isSelected = state.selectedIds.has(loc.id);
+        const card = document.createElement('div');
+        card.className = `card ${isSelected ? 'selected' : ''}`;
+
+        const statusClass = (loc.status || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        card.innerHTML = `
+          <div class="card-top">
+            <div>
+              <span class="card-code">${loc.code}</span>
+              <div class="card-name">${loc.name}</div>
+            </div>
+            <input type="checkbox" class="custom-check" ${isSelected ? 'checked' : ''}>
+          </div>
+          <div class="card-category">${loc.details || loc.category}</div>
+          <div class="card-footer">
+            <span class="status-badge ${statusClass}">${loc.status}</span>
+            <button class="btn btn-sm btn-locate-card">📍 Ver en Plano</button>
+          </div>
+        `;
+
+        card.querySelector('.btn-locate-card').addEventListener('click', (e) => {
+          e.stopPropagation();
+          focusLocationOnMap(loc, 2.2);
+        });
+
+        card.querySelector('input[type="checkbox"]').addEventListener('change', (e) => {
+          e.stopPropagation();
+          toggleSelect(loc.id);
+        });
+
+        card.addEventListener('click', (e) => {
+          if (e.target.type === 'checkbox' || e.target.classList.contains('btn-locate-card')) return;
+          toggleSelect(loc.id);
+        });
+
+        cardsGrid.appendChild(card);
+      });
+    }
+
+    // Render Table Body
+    function renderTable() {
+      const filtered = getFilteredLocations();
+      tableBody.innerHTML = '';
+
+      filtered.forEach(loc => {
+        const isSelected = state.selectedIds.has(loc.id);
+        const tr = document.createElement('tr');
+        if (isSelected) tr.classList.add('selected');
+
+        const statusClass = (loc.status || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        tr.innerHTML = `
+          <td><input type="checkbox" class="custom-check" ${isSelected ? 'checked' : ''}></td>
+          <td><strong style="color:var(--accent); font-family:'JetBrains Mono';">${loc.code}</strong></td>
+          <td><strong>${loc.name}</strong></td>
+          <td>${loc.level}</td>
+          <td>${loc.category}</td>
+          <td><span class="status-badge ${statusClass}">${loc.status}</span></td>
+          <td>
+            <button class="btn btn-sm btn-locate-tbl">📍 Ubicar</button>
+          </td>
+        `;
+
+        tr.querySelector('.btn-locate-tbl').addEventListener('click', (e) => {
+          e.stopPropagation();
+          focusLocationOnMap(loc, 2.2);
+        });
+
+        tr.querySelector('input[type="checkbox"]').addEventListener('change', (e) => {
+          e.stopPropagation();
+          toggleSelect(loc.id);
+        });
+
+        tr.addEventListener('click', (e) => {
+          if (e.target.type === 'checkbox' || e.target.classList.contains('btn-locate-tbl')) return;
+          toggleSelect(loc.id);
+        });
+
+        tableBody.appendChild(tr);
+      });
+    }
+
+    // Toggle Selection of an item
+    function toggleSelect(id) {
+      if (state.selectedIds.has(id)) {
+        state.selectedIds.delete(id);
+      } else {
+        state.selectedIds.add(id);
+      }
+      updateSelectionUI();
+    }
+
+    function updateSelectionUI() {
+      const count = state.selectedIds.size;
+      trayCountNum.textContent = count;
+      headerSelCount.textContent = count;
+      document.getElementById('drawer-sel-num').textContent = count;
+
+      selectionTray.classList.toggle('active', count > 0);
+
+      // Re-render views
+      renderPins();
+      renderSidebarList();
+      if (state.viewMode === 'grid') renderCardsGrid();
+      if (state.viewMode === 'table') renderTable();
+      if (drawer.classList.contains('active')) updateGeneratedText();
+    }
+
+    // Copy to clipboard helper
+    function copyText(text, msg = 'Copiado al portapapeles') {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast(msg);
+      }).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast(msg);
+      });
+    }
+
+    function showToast(msg) {
+      toastMsg.textContent = msg;
+      toast.classList.add('active');
+      setTimeout(() => toast.classList.remove('active'), 2500);
+    }
+
+    // View Switcher (Map vs Grid vs Table)
+    function switchViewMode(mode) {
+      state.viewMode = mode;
+      document.querySelectorAll('.view-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.view === mode);
+      });
+
+      document.getElementById('map-view-container').style.display = (mode === 'map') ? 'flex' : 'none';
+      document.getElementById('catalog-view-container').style.display = (mode === 'grid') ? 'block' : 'none';
+      document.getElementById('table-view-container').style.display = (mode === 'table') ? 'block' : 'none';
+
+      if (mode === 'map') {
+        setTimeout(fitToStage, 50);
+      } else if (mode === 'grid') {
+        renderCardsGrid();
+      } else if (mode === 'table') {
+        renderTable();
+      }
+    }
+
+    document.querySelectorAll('.view-tab').forEach(tab => {
+      tab.addEventListener('click', () => switchViewMode(tab.dataset.view));
+    });
+
+    // Floor buttons listener
+    document.querySelectorAll('.floor-btn').forEach(btn => {
+      btn.addEventListener('click', () => switchFloor(btn.dataset.floor));
+    });
+
+    // Category chips listener
+    document.querySelectorAll('.cat-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        state.selectedCategory = chip.dataset.cat;
+        renderSidebarList();
+        if (state.viewMode === 'grid') renderCardsGrid();
+        if (state.viewMode === 'table') renderTable();
+      });
+    });
+
+    // Search Box Listener
+    sidebarSearch.addEventListener('input', (e) => {
+      state.searchQuery = e.target.value;
+      sidebarSearchClear.style.display = state.searchQuery ? 'block' : 'none';
+      renderSidebarList();
+      if (state.viewMode === 'grid') renderCardsGrid();
+      if (state.viewMode === 'table') renderTable();
+    });
+
+    sidebarSearchClear.addEventListener('click', () => {
+      sidebarSearch.value = '';
+      state.searchQuery = '';
+      sidebarSearchClear.style.display = 'none';
+      renderSidebarList();
+      if (state.viewMode === 'grid') renderCardsGrid();
+      if (state.viewMode === 'table') renderTable();
+    });
+
+    // Map Tool Controls
+    document.getElementById('ctrl-zoom-in').addEventListener('click', () => {
+      const stageW = mapStage.clientWidth;
+      const stageH = mapStage.clientHeight;
+      zoomAt(state.scale * 1.3, stageW / 2, stageH / 2, true);
+    });
+
+    document.getElementById('ctrl-zoom-out').addEventListener('click', () => {
+      const stageW = mapStage.clientWidth;
+      const stageH = mapStage.clientHeight;
+      zoomAt(state.scale / 1.3, stageW / 2, stageH / 2, true);
+    });
+
+    document.getElementById('ctrl-reset').addEventListener('click', resetZoom);
+    document.getElementById('ctrl-fit').addEventListener('click', fitToStage);
+
+    // Toggle Labels & Pins
+    const toggleLabelsBtn = document.getElementById('ctrl-toggle-labels');
+    toggleLabelsBtn.addEventListener('click', () => {
+      state.showLabels = !state.showLabels;
+      toggleLabelsBtn.classList.toggle('active', !state.showLabels);
+      pinsLayer.classList.toggle('pins-labels-hidden', !state.showLabels);
+    });
+
+    const togglePinsBtn = document.getElementById('ctrl-toggle-pins');
+    togglePinsBtn.addEventListener('click', () => {
+      state.showPins = !state.showPins;
+      togglePinsBtn.classList.toggle('active', !state.showPins);
+      renderPins();
+    });
+
+    // Sector Jumper Buttons
+    document.querySelectorAll('.jump-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const x = parseFloat(btn.dataset.x);
+        const y = parseFloat(btn.dataset.y);
+        const cfg = FLOOR_MAPS[state.currentFloor];
+        const stageW = mapStage.clientWidth;
+        const stageH = mapStage.clientHeight;
+        const targetX = (x / 100) * cfg.width;
+        const targetY = (y / 100) * cfg.height;
+
+        state.scale = 2.0;
+        state.panX = stageW / 2 - targetX * state.scale;
+        state.panY = stageH / 2 - targetY * state.scale;
+        updateTransform(true);
+      });
+    });
+
+    // Tray quick copy
+    document.getElementById('tray-copy-names').addEventListener('click', () => {
+      const selected = LOCATIONS.filter(l => state.selectedIds.has(l.id));
+      const names = selected.map(l => l.name).join(', ');
+      copyText(names, `${selected.length} nombres copiados`);
+    });
+
+    document.getElementById('tray-copy-codes').addEventListener('click', () => {
+      const selected = LOCATIONS.filter(l => state.selectedIds.has(l.id));
+      const text = selected.map(l => `${l.code} - ${l.name}`).join('\n');
+      copyText(text, `${selected.length} códigos y nombres copiados`);
+    });
+
+    document.getElementById('tray-clear').addEventListener('click', () => {
+      state.selectedIds.clear();
+      updateSelectionUI();
+    });
+
+    // Drawer Export Generation
+    const drawer = document.getElementById('drawer');
+    const drawerOverlay = document.getElementById('drawer-overlay');
+    const outputTextarea = document.getElementById('output-textarea');
+
+    function openDrawer() {
+      drawer.classList.add('active');
+      drawerOverlay.classList.add('active');
+      updateGeneratedText();
+    }
+
+    function closeDrawer() {
+      drawer.classList.remove('active');
+      drawerOverlay.classList.remove('active');
+    }
+
+    document.getElementById('btn-open-panel').addEventListener('click', openDrawer);
+    document.getElementById('tray-open-panel').addEventListener('click', openDrawer);
+    document.getElementById('drawer-close-btn').addEventListener('click', closeDrawer);
+    document.getElementById('drawer-done-btn').addEventListener('click', closeDrawer);
+    drawerOverlay.addEventListener('click', closeDrawer);
+
+    function updateGeneratedText() {
+      const selected = LOCATIONS.filter(l => state.selectedIds.has(l.id));
+      let out = '';
+
+      switch (state.outputFormat) {
+        case 'names-comma':
+          out = selected.map(l => l.name).join(', ');
+          break;
+        case 'names-line':
+          out = selected.map(l => l.name).join('\n');
+          break;
+        case 'code-name':
+          out = selected.map(l => `${l.code}: ${l.name} (${l.level})`).join('\n');
+          break;
+        case 'markdown-table':
+          out = '| Código | Nombre Comercial | Nivel | Categoría | Estado |\n| :--- | :--- | :--- | :--- | :--- |\n';
+          out += selected.map(l => `| **${l.code}** | ${l.name} | ${l.level} | ${l.category} | ${l.status} |`).join('\n');
+          break;
+        case 'csv':
+          out = 'Codigo,Nombre,Nivel,Categoria,Estado,Detalles\n';
+          out += selected.map(l => `"${l.code}","${l.name}","${l.level}","${l.category}","${l.status}","${l.details}"`).join('\n');
+          break;
+        case 'json':
+          out = JSON.stringify(selected, null, 2);
+          break;
+      }
+      outputTextarea.value = out;
+    }
+
+    document.querySelectorAll('.format-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.outputFormat = btn.dataset.format;
+        updateGeneratedText();
+      });
+    });
+
+    document.getElementById('btn-copy-drawer-text').addEventListener('click', () => {
+      copyText(outputTextarea.value, 'Texto exportado copiado');
+    });
+
+    // Theme Switcher
+    const themeBtn = document.getElementById('btn-theme');
+    let isDark = true;
+    themeBtn.addEventListener('click', () => {
+      isDark = !isDark;
+      if (isDark) {
+        document.documentElement.removeAttribute('data-theme');
+      } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    });
+
+    // Keyboard Shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeDrawer();
+        inspector.classList.remove('active');
+        state.activeSpotlightId = null;
+        renderPins();
+        renderSidebarList();
+      }
+      if (e.key === '/' && document.activeElement !== sidebarSearch && document.activeElement !== outputTextarea) {
+        e.preventDefault();
+        sidebarSearch.focus();
+      }
+    });
+
+    // Window Resize -> re-fit
+    window.addEventListener('resize', () => {
+      if (state.viewMode === 'map') fitToStage();
+    });
+
+    // INITIALIZATION
+    switchFloor('pb');
+  </script>
+</body>
+</html>
